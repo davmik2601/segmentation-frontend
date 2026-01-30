@@ -52,8 +52,8 @@ function toLocalInputValue(ms) {
  * - on "remove": close interval if open
  */
 function buildTagIntervals(history, fromMs, toMs) {
-  const byTagId = new Map() // tagId -> {openStartMs, tag}
-  const intervals = [] // {tagId, name, color, startMs, endMs}
+  const byTagId = new Map()
+  const intervals = []
 
   const sorted = [...history].sort((a, b) => normalizeCreatedAtToMs(a.createdAt) - normalizeCreatedAtToMs(b.createdAt))
 
@@ -73,18 +73,28 @@ function buildTagIntervals(history, fromMs, toMs) {
           tagId: h.tagId,
           name: state.tag?.name || String(h.tagId),
           color: state.tag?.color || null,
+
+          // chart window (clamped)
           startMs: Math.max(state.openStartMs, fromMs),
           endMs: Math.min(ms, toMs),
+
+          // real interval (for tooltip)
+          realStartMs: state.openStartMs,
+          realEndMs: ms,
         })
         byTagId.delete(h.tagId)
       } else {
-        // no "set" inside range -> assume it was already active at fromMs
+        // fallback: no known "add" (should be rare now)
         intervals.push({
           tagId: h.tagId,
           name: t?.name || String(h.tagId),
           color: t?.color || null,
+
           startMs: fromMs,
           endMs: Math.min(ms, toMs),
+
+          realStartMs: fromMs,
+          realEndMs: ms,
         })
       }
     }
@@ -96,12 +106,15 @@ function buildTagIntervals(history, fromMs, toMs) {
       tagId,
       name: state.tag?.name || String(tagId),
       color: state.tag?.color || null,
+
       startMs: Math.max(state.openStartMs, fromMs),
       endMs: toMs,
+
+      realStartMs: state.openStartMs,
+      realEndMs: toMs,
     })
   }
 
-  // filter out invalid intervals
   return intervals.filter(x => x.endMs > x.startMs)
 }
 
@@ -112,7 +125,7 @@ function buildTagIntervals(history, fromMs, toMs) {
  */
 function buildSegmentIntervals(history, fromMs, toMs) {
   const sorted = [...history]
-    .filter(h => h.type === 'segment' && h.action === 'set' && h.segmentId != null)
+    .filter(h => h.segmentId !== undefined && h.segmentId !== null)
     .sort((a, b) => normalizeCreatedAtToMs(a.createdAt) - normalizeCreatedAtToMs(b.createdAt))
 
   const intervals = []
@@ -127,7 +140,7 @@ function buildSegmentIntervals(history, fromMs, toMs) {
       continue
     }
 
-    // close previous at this new set time
+    // close previous
     intervals.push({
       name: open.segment?.name || String(open.segment?.id),
       color: open.segment?.color || null,
@@ -139,7 +152,6 @@ function buildSegmentIntervals(history, fromMs, toMs) {
     open = {segment: seg, startMs: ms}
   }
 
-  // close last to end of window
   if (open) {
     intervals.push({
       name: open.segment?.name || String(open.segment?.id),
@@ -160,22 +172,16 @@ export default function UserHistoryCharts({user, onBack}) {
   const nowMs = Date.now()
 
   // default window: last 30 days
-  const [fromMs, setFromMs] = useState(() => {
-    // const raw = localStorage.getItem('ui:historyFromMs')
-    // return raw ? Number(raw) : nowMs - 2 * 24 * 3600 * 1000
-    return nowMs - 2 * 24 * 3600 * 1000
-  })
+  // applied (controls chart + request)
+  const [appliedFromMs, setAppliedFromMs] = useState(nowMs - 2 * 24 * 3600 * 1000)
+  const [appliedToMs, setAppliedToMs] = useState(null)
 
-  const [toMs, setToMs] = useState(() => {
-    // const raw = localStorage.getItem('ui:historyToMs')
-    // return raw ? Number(raw) : nowMs
-    return null
-  })
-
-  const [autoToMs, setAutoToMs] = useState(null)
+  // draft (controls inputs only)
+  const [draftFromMs, setDraftFromMs] = useState(nowMs - 2 * 24 * 3600 * 1000)
+  const [draftToMs, setDraftToMs] = useState(null)
 
   // const effectiveToMs = toMs ?? autoToMs ?? Date.now()
-  const effectiveToMs = toMs ?? Date.now()
+  const effectiveToMs = appliedToMs ?? Date.now()
 
   async function load() {
     setLoading(true)
@@ -183,23 +189,14 @@ export default function UserHistoryCharts({user, onBack}) {
     try {
       const res = await api.getUserHistory({
         userId: user.id,
-        from: toUnixSeconds(fromMs),
-        ...(toMs !== null ? {to: toUnixSeconds(toMs)} : {}),
+        from: toUnixSeconds(appliedFromMs),
+        ...(appliedToMs !== null ? {to: toUnixSeconds(appliedToMs)} : {}),
         limit: 5000,
         offset: 0,
       })
 
       const items = res?.history ?? []
       setHistory(items)
-
-      if (items.length) {
-        const msList = items.map(x => normalizeCreatedAtToMs(x.createdAt)).sort((a, b) => a - b)
-        const min = msList[0]
-        const max = msList[msList.length - 1]
-        setFromMs(min - 60 * 1000) // -1 min
-        // setToMs(max + 60 * 1000)   // +1 min
-        setAutoToMs(max + 60 * 1000)
-      }
     } catch (e) {
       setErr(e?.message || String(e))
     } finally {
@@ -208,12 +205,12 @@ export default function UserHistoryCharts({user, onBack}) {
   }
 
   useEffect(() => {
-    localStorage.setItem('ui:historyFromMs', String(fromMs))
-  }, [fromMs])
+    localStorage.setItem('ui:historyFromMs', String(appliedFromMs))
+  }, [appliedFromMs])
 
   useEffect(() => {
-    localStorage.setItem('ui:historyToMs', String(toMs))
-  }, [toMs])
+    localStorage.setItem('ui:historyToMs', String(appliedToMs ?? ''))
+  }, [appliedToMs])
 
   useEffect(() => {
     load()
@@ -221,12 +218,13 @@ export default function UserHistoryCharts({user, onBack}) {
   }, [])
 
   const tagIntervals = useMemo(
-    () => buildTagIntervals(history.filter(h => h.type === 'tag'), fromMs, effectiveToMs),
-    [history, fromMs, effectiveToMs],
+    () => buildTagIntervals(history.filter(h => h.type === 'tag'), appliedFromMs, effectiveToMs),
+    [history, appliedFromMs, effectiveToMs],
   )
+
   const segmentIntervals = useMemo(
-    () => buildSegmentIntervals(history, fromMs, effectiveToMs),
-    [history, fromMs, effectiveToMs],
+    () => buildSegmentIntervals(history.filter(h => h.type === 'segment'), appliedFromMs, effectiveToMs),
+    [history, appliedFromMs, effectiveToMs],
   )
 
   // Categories (one row per tag)
@@ -251,6 +249,9 @@ export default function UserHistoryCharts({user, onBack}) {
       y: tagNameToIndex.get(it.name) ?? 0,
       color: it.color || undefined,
       name: it.name,
+
+      realStartMs: it.realStartMs ?? it.startMs,
+      realEndMs: it.realEndMs ?? it.endMs,
     }))
   }, [tagIntervals, tagNameToIndex])
 
@@ -264,7 +265,7 @@ export default function UserHistoryCharts({user, onBack}) {
       title: {text: null},
       xAxis: {
         type: 'datetime',
-        min: fromMs,
+        min: appliedFromMs,
         // max: toMs,
         max: effectiveToMs,
         labels: {
@@ -288,8 +289,8 @@ export default function UserHistoryCharts({user, onBack}) {
       legend: {enabled: false},
       tooltip: {
         formatter: function () {
-          const start = fmtDateTime(this.point.x)
-          const end = fmtDateTime(this.point.x2)
+          const start = fmtDateTime(this.point.realStartMs ?? this.point.x)
+          const end = fmtDateTime(this.point.realEndMs ?? this.point.x2)
           return `<b>${this.point.name}</b><br/>${start} → ${end}`
         },
       },
@@ -318,7 +319,7 @@ export default function UserHistoryCharts({user, onBack}) {
       ],
       credits: {enabled: false},
     }
-  }, [tagCategories, tagSeriesData, fromMs, toMs])
+  }, [tagCategories, tagSeriesData, appliedFromMs, effectiveToMs])
 
   const segmentSeriesData = useMemo(() => {
     return segmentIntervals.map(it => ({
@@ -340,7 +341,7 @@ export default function UserHistoryCharts({user, onBack}) {
       title: {text: null},
       xAxis: {
         type: 'datetime',
-        min: fromMs,
+        min: appliedFromMs,
         // max: toMs,
         max: effectiveToMs,
         labels: {
@@ -380,7 +381,7 @@ export default function UserHistoryCharts({user, onBack}) {
       ],
       credits: {enabled: false},
     }
-  }, [segmentSeriesData, fromMs, toMs])
+  }, [segmentSeriesData, appliedFromMs, effectiveToMs])
 
   return (
     <div className="stack">
@@ -394,7 +395,18 @@ export default function UserHistoryCharts({user, onBack}) {
 
         <div className="row row--gap">
           <button className="btn btn--ghost" onClick={onBack}>Back</button>
-          <button className="btn" onClick={load} disabled={loading}>Refresh</button>
+          <button
+            className="btn"
+            onClick={() => {
+              setAppliedFromMs(draftFromMs)
+              setAppliedToMs(draftToMs)
+              // call load AFTER state update:
+              setTimeout(load, 0)
+            }}
+            disabled={loading}
+          >
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -406,8 +418,8 @@ export default function UserHistoryCharts({user, onBack}) {
           <input
             className="input"
             type="datetime-local"
-            value={new Date(fromMs).toISOString().slice(0, 16)}
-            onChange={e => setFromMs(new Date(e.target.value).getTime())}
+            value={draftFromMs ? toLocalInputValue(draftFromMs) : ''}
+            onChange={e => setDraftFromMs(e.target.value ? new Date(e.target.value).getTime() : null)}
           />
         </div>
 
@@ -416,8 +428,8 @@ export default function UserHistoryCharts({user, onBack}) {
           <input
             className="input"
             type="datetime-local"
-            value={toMs ? toLocalInputValue(toMs) : ''}
-            onChange={e => setToMs(e.target.value ? new Date(e.target.value).getTime() : null)}
+            value={draftToMs ? toLocalInputValue(draftToMs) : ''}
+            onChange={e => setDraftToMs(e.target.value ? new Date(e.target.value).getTime() : null)}
           />
         </div>
       </div>

@@ -27,7 +27,7 @@ async function req(path, {method = 'GET', body} = {}) {
   })
 
   const text = await res.text()
-  let data = null
+  let data
   try {
     data = text ? JSON.parse(text) : null
   } catch {
@@ -61,7 +61,7 @@ export const api = {
 
   getUserHistory: ({userId, from, to, limit = 5000, offset = 0}) =>
     req(
-      `/api/history/user?` +
+      `/api/users/history?` +
       `prefix=${encodeURIComponent(API_PREFIX)}` +
       `&userId=${encodeURIComponent(userId)}` +
       `&from=${encodeURIComponent(from)}` +
