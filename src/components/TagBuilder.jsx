@@ -192,7 +192,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
       } else {
         await onCreate(previewPayload)
         // reset form after create
-        setState(s => ({...deepClone(s), name: ''}))
+        setState(deepClone(initialState))
       }
     } catch (e) {
       setErrors([e?.message || String(e)])
@@ -311,9 +311,13 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
 
                   // UI behavior similar to your backend refine rules
                   const isLogin = event === 'login'
-                  const metricDisabled = isLogin || aggregation === 'count'
-                  const aggregationDisabled = isLogin
+                  const isNetResult = event === 'net_result'
+                  const metricDisabled = isLogin || isNetResult || aggregation === 'count'
+                  const aggregationDisabled = isLogin || isNetResult
                   const forcedAggregation = isLogin ? 'count' : aggregation
+
+                  const aggregationUiValue = isNetResult ? '' : forcedAggregation
+                  const aggregationUiDisabled = isLogin || isNetResult
 
                   const betweenNeedsTo = operator === 'between' || operator === 'not_between'
                   const valueToDisabled = !betweenNeedsTo
@@ -377,8 +381,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                           <div className="label">Aggregation</div>
                           <select
                             className="select"
-                            value={forcedAggregation}
-                            disabled={aggregationDisabled}
+                            value={aggregationUiValue}
+                            disabled={aggregationUiDisabled}
                             onChange={e => {
                               const nextAgg = e.target.value
                               // if count => metric=null
@@ -389,6 +393,12 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                               }
                             }}
                           >
+                            {isNetResult && (
+                              <option value="" disabled>
+                                not allowed
+                              </option>
+                            )}
+
                             {ENUMS.aggregations.map(x => <option key={x} value={x}>{x}</option>)}
                           </select>
                         </div>
@@ -459,7 +469,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                             onChange={e => {
                               const v = e.target.value
                               if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
-                            }}                          />
+                            }}/>
                         </div>
 
                         <div className="field">
