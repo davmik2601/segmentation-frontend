@@ -212,7 +212,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         </div>
       )}
 
-      <div className="grid2">
+      <div className="grid2 grid2--tagHeader">
         <div className="field">
           <div className="label">Tag name</div>
           <input

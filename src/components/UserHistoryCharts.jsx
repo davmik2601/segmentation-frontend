@@ -59,7 +59,7 @@ function buildTagIntervals(history, fromMs, toMs) {
 
   for (const h of sorted) {
     if (!h.tagId) continue
-    const t = h.tag || {id: h.tagId, name: String(h.tagId), color: null}
+    const t = h.tag || {id: h.tagId, name: String(h.tagId), description: '', persistent: 0, color: null}
     const ms = normalizeCreatedAtToMs(h.createdAt)
     const kind = actionKind(h.action)
 
@@ -72,6 +72,8 @@ function buildTagIntervals(history, fromMs, toMs) {
         intervals.push({
           tagId: h.tagId,
           name: state.tag?.name || String(h.tagId),
+          description: state.tag?.description || '',
+          persistent: state.tag?.persistent || 0,
           color: state.tag?.color || null,
 
           // chart window (clamped)
@@ -88,6 +90,8 @@ function buildTagIntervals(history, fromMs, toMs) {
         intervals.push({
           tagId: h.tagId,
           name: t?.name || String(h.tagId),
+          description: t?.description || '',
+          persistent: t?.persistent || 0,
           color: t?.color || null,
 
           startMs: fromMs,
@@ -105,6 +109,8 @@ function buildTagIntervals(history, fromMs, toMs) {
     intervals.push({
       tagId,
       name: state.tag?.name || String(tagId),
+      description: state.tag?.description || '',
+      persistent: state.tag?.persistent || 0,
       color: state.tag?.color || null,
 
       startMs: Math.max(state.openStartMs, fromMs),
@@ -249,6 +255,8 @@ export default function UserHistoryCharts({user, onBack}) {
       y: tagNameToIndex.get(it.name) ?? 0,
       color: it.color || undefined,
       name: it.name,
+      description: it.description || '',
+      persistent: it.persistent || 0,
 
       realStartMs: it.realStartMs ?? it.startMs,
       realEndMs: it.realEndMs ?? it.endMs,
@@ -291,7 +299,9 @@ export default function UserHistoryCharts({user, onBack}) {
         formatter: function () {
           const start = fmtDateTime(this.point.realStartMs ?? this.point.x)
           const end = fmtDateTime(this.point.realEndMs ?? this.point.x2)
-          return `<b>${this.point.name}</b><br/>${start} → ${end}`
+          const desc = String(this.point.description || '').trim()
+          const pers = this.point.persistent ? ' (persistent)' : ' (non-persistent)'
+          return `<b>${this.point.name}</b>${pers}` + (desc ? `<br/>${desc}` : '') + `<br/><br/>${start} → ${end}`
         },
       },
       series: [
@@ -367,7 +377,7 @@ export default function UserHistoryCharts({user, onBack}) {
         formatter: function () {
           const start = fmtDateTime(this.point.x)
           const end = fmtDateTime(this.point.x2)
-          return `<b>${this.point.name}</b><br/>${start} → ${end}`
+          return `<b>${this.point.name}</b><br/><br/>${start} → ${end}`
         },
       },
       series: [

@@ -113,7 +113,7 @@ export default function UsersWithSegmentsAndTags({prefix='gtestbet', onBack, onO
                         <Badge
                           key={t.id}
                           text={t.name || t.slug}
-                          description={t.description}
+                          description={`${t.description} (${t.persistent ? 'persistent' : 'non-persistent'})`}
                           color={t.color || undefined}
                         />
                       ))
