@@ -157,7 +157,7 @@ function TagsPage() {
             <div className="pill">{loading ? 'Loading…' : `${tags.length} items`}</div>
           </div>
 
-          <TagList tags={tags} onEdit={startEdit} onDelete={onDelete} />
+          <TagList tags={tags} onEdit={startEdit} onDelete={onDelete}/>
         </section>
       </main>
     </>
@@ -225,11 +225,11 @@ export default function App() {
   return (
     <div className="page">
       <Routes>
-        <Route path="/" element={<Navigate to="/tags" replace />} />
-        <Route path="/tags" element={<TagsPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/users/:userId/history" element={<HistoryPage />} />
-        <Route path="*" element={<Navigate to="/tags" replace />} />
+        <Route path="/" element={<Navigate to="/tags" replace/>}/>
+        <Route path="/tags" element={<TagsPage/>}/>
+        <Route path="/users" element={<UsersPage/>}/>
+        <Route path="/users/:userId/history" element={<HistoryPage/>}/>
+        <Route path="*" element={<Navigate to="/tags" replace/>}/>
       </Routes>
     </div>
   )
