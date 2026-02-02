@@ -34,6 +34,10 @@ export function validateTagPayload(payload) {
   if (!payload || typeof payload !== 'object') errors.push('payload must be an object')
   if (!payload.prefix || payload.prefix !== 'gtestbet') errors.push('prefix must be "gtestbet"')
   if (!payload.name || !String(payload.name).trim()) errors.push('name is required')
+
+  if (![0, 1].includes(Number(payload.active ?? 0))) errors.push('active must be 0 or 1')
+  if (![0, 1].includes(Number(payload.persistent ?? 0))) errors.push('persistent must be 0 or 1')
+
   if (!Array.isArray(payload.groups) || !payload.groups.length) errors.push('at least 1 group is required')
 
   ;(payload.groups ?? []).forEach((g, gi) => {

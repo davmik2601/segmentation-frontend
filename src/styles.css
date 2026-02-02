@@ -70,7 +70,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .grid2 {
     display: grid;
-    grid-template-columns: max-content max-content;
+    grid-template-columns: 2fr 0.8fr max-content;
     gap: 12px;
     justify-content: space-between;
 }
@@ -342,4 +342,39 @@ select option {
 
 .chip:hover {
     cursor: help;
+}
+
+
+.checkboxToggle {
+    width: 25px;
+    height: 25px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    border-radius: 4px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.checkboxToggle:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.checkboxToggle:checked {
+    background: #4f8cff;
+    border-color: #4f8cff;
+}
+
+.checkboxToggle:checked::after {
+    content: '';
+    width: 6px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }

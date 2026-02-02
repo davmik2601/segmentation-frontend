@@ -51,6 +51,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     setState(s => ({...s, active}))
   }
 
+  function setPersistent(persistent) {
+    setState(s => ({...s, persistent}))
+  }
+
   function addGroup() {
     setState(s => {
       const groups = [...(s.groups ?? [])]
@@ -148,6 +152,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
       prefix: 'gtestbet',
       name: state.name ?? '',
       active: Number(state.active ?? 0) ? 1 : 0,
+      persistent: Number(state.persistent ?? 0) ? 1 : 0,
       groups: (state.groups ?? []).map((g, gi) => ({
         connector: gi === 0 ? 'and' : (g.connector || 'and'),
         sort: gi + 1,
@@ -219,6 +224,20 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         </div>
 
         <div className="field">
+          <div className="label">Persistent</div>
+
+          <label className="row row--gap" style={{alignItems: 'center'}}>
+            <input
+              type="checkbox"
+              className="checkboxToggle"
+              checked={Number(state.persistent ?? 0) === 1}
+              onChange={e => setPersistent(e.target.checked ? 1 : 0)}
+            />
+            <span className="mutedSmall">Persistent</span>
+          </label>
+        </div>
+
+        <div className="field">
           <div className="label">Active</div>
           <div className="row row--gap">
             <button
@@ -237,6 +256,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             </button>
           </div>
         </div>
+
       </div>
 
       <div className="row row--space">
