@@ -264,10 +264,15 @@ export default function UserHistoryCharts({user, onBack}) {
   }, [tagIntervals, tagNameToIndex])
 
   const tagsChartOptions = useMemo(() => {
+    const rowH = 48
+    const baseH = 110
+    const chartH = Math.max(280, baseH + tagCategories.length * rowH)
+    const barH = Math.max(10, rowH - 10) // bar almost fills the row
+
     return {
       chart: {
         type: 'xrange',
-        height: Math.max(240, 80 + tagCategories.length * 34),
+        height: chartH,
         backgroundColor: 'transparent',
       },
       title: {text: null},
@@ -287,6 +292,8 @@ export default function UserHistoryCharts({user, onBack}) {
         title: {text: null},
         categories: tagCategories,
         reversed: true,
+        minPadding: 0,
+        maxPadding: 0,
         labels: {
           style: {
             color: 'rgba(255,255,255,0.85)', /* ← white */
@@ -310,6 +317,7 @@ export default function UserHistoryCharts({user, onBack}) {
           borderColor: 'rgba(0,0,0,0.25)',
           borderWidth: 1,
           data: tagSeriesData,
+          pointWidth: barH,
           dataLabels: {
             enabled: true,
             inside: true,
@@ -451,7 +459,11 @@ export default function UserHistoryCharts({user, onBack}) {
 
       <div className="cardInner">
         <div className="cardInner__title">Tags timeline</div>
-        <HighchartsReact highcharts={Highcharts} options={tagsChartOptions}/>
+        <HighchartsReact
+          key={`tags-${tagCategories.length}`}
+          highcharts={Highcharts}
+          options={tagsChartOptions}
+        />
       </div>
     </div>
   )
