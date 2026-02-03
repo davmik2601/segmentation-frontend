@@ -10,6 +10,12 @@ export function normalizeRuleByBusinessRules(rule) {
     out.metric = null
   }
 
+  // - if event == net_result => aggregation and metric must be null
+  if (out.event === 'net_result') {
+    out.aggregation = null
+    out.metric = null
+  }
+
   // - if aggregation == count => metric must be null (or omitted)
   if (out.aggregation === 'count') {
     out.metric = null
@@ -47,7 +53,13 @@ export function validateTagPayload(payload) {
     ;(g.rules ?? []).forEach((r, ri) => {
       if (!ENUMS.connectors.includes(r.connector)) errors.push(`rule[${gi}][${ri}].connector invalid`)
       if (!ENUMS.events.includes(r.event)) errors.push(`rule[${gi}][${ri}].event invalid`)
-      if (!ENUMS.aggregations.includes(r.aggregation)) errors.push(`rule[${gi}][${ri}].aggregation invalid`)
+
+      if (r.event !== 'net_result') {
+        if (!ENUMS.aggregations.includes(r.aggregation)) errors.push(`rule[${gi}][${ri}].aggregation invalid`)
+      } else {
+        if (r.aggregation != null) errors.push(`rule[${gi}][${ri}].aggregation must be null when event=net_result`)
+      }
+
       if (!ENUMS.operators.includes(r.operator)) errors.push(`rule[${gi}][${ri}].operator invalid`)
       if (!ENUMS.periodUnits.includes(r.periodUnit)) errors.push(`rule[${gi}][${ri}].periodUnit invalid`)
 
@@ -59,7 +71,12 @@ export function validateTagPayload(payload) {
       if (!Number.isInteger(r.periodValue) || r.periodValue < 0) errors.push(`rule[${gi}][${ri}].periodValue must be int >= 0`)
 
       // backend refine rules mirrored:
-      if (r.aggregation !== 'count' && !r.metric) errors.push(`rule[${gi}][${ri}].metric is required when aggregation != count`)
+      if (r.event !== 'net_result') {
+        if (r.aggregation !== 'count' && !r.metric) errors.push(`rule[${gi}][${ri}].metric is required when aggregation != count`)
+      } else {
+        if (r.metric != null) errors.push(`rule[${gi}][${ri}].metric must be null when event=net_result`)
+      }
+
       if (r.event === 'login') {
         if (r.metric) errors.push(`rule[${gi}][${ri}].metric must be empty when event=login`)
         if (r.aggregation !== 'count') errors.push(`rule[${gi}][${ri}].aggregation must be count when event=login`)
