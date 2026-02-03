@@ -1,7 +1,7 @@
 import {clearAccessToken, getAccessToken} from './auth.js'
 
-const BASE = '' // because vite proxy routes /api -> http://localhost:3030
-export const API_PREFIX = 'gtestbet'
+const BASE = '' // because vite proxy routes /api/backoffice
+export const API_PREFIX = 'gtestbet' // for local development use 'gtestbet'
 
 async function req(path, {method = 'GET', body} = {}) {
   let url = `${BASE}${path}`
