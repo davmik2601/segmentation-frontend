@@ -35,7 +35,7 @@ export default function TagList({tags, onEdit, onDelete}) {
           return (
             <div key={tag.id} className="list__item">
               <div className="list__left">
-                <div className="dot" style={{background: color}} />
+                <div className="dot" style={{background: color}}/>
                 <div className="list__meta">
                   <div className="list__title">
                     {tag.name}
