@@ -46,11 +46,13 @@ export function validateTagPayload(payload) {
 
   if (!Array.isArray(payload.groups) || !payload.groups.length) errors.push('at least 1 group is required')
 
-  ;(payload.groups ?? []).forEach((g, gi) => {
+  ;
+  (payload.groups ?? []).forEach((g, gi) => {
     if (!ENUMS.connectors.includes(g.connector)) errors.push(`group[${gi}].connector must be "and" | "or"`)
     if (!Array.isArray(g.rules) || !g.rules.length) errors.push(`group[${gi}] must have at least 1 rule`)
 
-    ;(g.rules ?? []).forEach((r, ri) => {
+    ;
+    (g.rules ?? []).forEach((r, ri) => {
       if (!ENUMS.connectors.includes(r.connector)) errors.push(`rule[${gi}][${ri}].connector invalid`)
       if (!ENUMS.events.includes(r.event)) errors.push(`rule[${gi}][${ri}].event invalid`)
 

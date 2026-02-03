@@ -23,7 +23,7 @@ function Badge({text, color, muted, description}) {
   )
 }
 
-export default function UsersWithSegmentsAndTags({prefix='gtestbet', onBack, onOpenUser, page, onPageChange}) {
+export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, onOpenUser, page, onPageChange}) {
   const [users, setUsers] = useState([])
   const [meta, setMeta] = useState({count: 0})
   const [loading, setLoading] = useState(false)
