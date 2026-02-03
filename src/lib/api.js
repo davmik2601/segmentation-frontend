@@ -1,3 +1,5 @@
+import {clearAccessToken, getAccessToken} from './auth.js'
+
 const BASE = '' // because vite proxy routes /api -> http://localhost:3030
 export const API_PREFIX = 'gtestbet'
 
@@ -20,11 +22,24 @@ async function req(path, {method = 'GET', body} = {}) {
     body = undefined
   }
 
+  const token = getAccessToken()
+
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
   const res = await fetch(url, {
     method,
-    headers: body ? {'Content-Type': 'application/json'} : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+
+  if (res.status === 401) {
+    clearAccessToken()
+    // hard redirect so user can't stay on protected pages
+    window.location.assign('/auth')
+    return
+  }
 
   const text = await res.text()
   let data
