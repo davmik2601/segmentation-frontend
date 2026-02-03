@@ -152,6 +152,8 @@ function buildSegmentIntervals(history, fromMs, toMs) {
       color: open.segment?.color || null,
       startMs: Math.max(open.startMs, fromMs),
       endMs: Math.min(ms, toMs),
+      realStartMs: open.startMs,
+      realEndMs: ms,
     })
 
     // open new
@@ -164,6 +166,8 @@ function buildSegmentIntervals(history, fromMs, toMs) {
       color: open.segment?.color || null,
       startMs: Math.max(open.startMs, fromMs),
       endMs: toMs,
+      realStartMs: open.startMs,
+      realEndMs: toMs,
     })
   }
 
@@ -346,6 +350,8 @@ export default function UserHistoryCharts({user, onBack}) {
       y: 0,
       color: it.color || undefined,
       name: it.name,
+      realStartMs: it.realStartMs,
+      realEndMs: it.realEndMs,
     }))
   }, [segmentIntervals])
 
@@ -383,8 +389,10 @@ export default function UserHistoryCharts({user, onBack}) {
       legend: {enabled: false},
       tooltip: {
         formatter: function () {
-          const start = fmtDateTime(this.point.x)
-          const end = fmtDateTime(this.point.x2)
+          const startMs = this.point.realStartMs != null ? this.point.realStartMs : this.point.x
+          const endMs = this.point.realEndMs != null ? this.point.realEndMs : this.point.x2
+          const start = fmtDateTime(startMs)
+          const end = fmtDateTime(endMs)
           return `<b>${this.point.name}</b><br/><br/>${start} → ${end}`
         },
       },
