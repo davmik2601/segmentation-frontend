@@ -1,12 +1,29 @@
 import React, {useEffect, useMemo, useState} from 'react'
 import {Routes, Route, Navigate, useNavigate, useSearchParams, useParams} from 'react-router-dom'
+import AppHeader from './components/AppHeader.jsx'
 import TagBuilder from './components/TagBuilder.jsx'
 import TagList from './components/TagList.jsx'
 import UsersWithSegmentsAndTags from './components/UsersWithSegmentsAndTags.jsx'
 import UserHistoryCharts from './components/UserHistoryCharts.jsx'
 import {api} from './lib/api.js'
 import {uid} from './lib/uid.js'
+import {getAccessToken} from './lib/auth.js'
+import AuthPage from './components/AuthPage.jsx'
 
+function RequireAuth({children}) {
+  const token = getAccessToken()
+  if (!token) return <Navigate to="/auth" replace/>
+  return children
+}
+
+function ProtectedLayout({children}) {
+  return (
+    <>
+      <AppHeader/>
+      {children}
+    </>
+  )
+}
 
 function TagsPage() {
   const [tags, setTags] = useState([])
@@ -225,11 +242,58 @@ export default function App() {
   return (
     <div className="page">
       <Routes>
-        <Route path="/" element={<Navigate to="/tags" replace/>}/>
-        <Route path="/tags" element={<TagsPage/>}/>
-        <Route path="/users" element={<UsersPage/>}/>
-        <Route path="/users/:userId/history" element={<HistoryPage/>}/>
-        <Route path="*" element={<Navigate to="/tags" replace/>}/>
+        <Route path="/auth" element={<AuthPage/>}/>
+
+        <Route
+          path="/"
+          element={
+            getAccessToken()
+              ? <Navigate to="/tags" replace/>
+              : <Navigate to="/auth" replace/>
+          }
+        />
+
+        <Route
+          path="/tags"
+          element={
+            <RequireAuth>
+              <ProtectedLayout>
+                <TagsPage/>
+              </ProtectedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            <RequireAuth>
+              <ProtectedLayout>
+                <UsersPage/>
+              </ProtectedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/users/:userId/history"
+          element={
+            <RequireAuth>
+              <ProtectedLayout>
+                <HistoryPage/>
+              </ProtectedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="*"
+          element={
+            getAccessToken()
+              ? <Navigate to="/tags" replace/>
+              : <Navigate to="/auth" replace/>
+          }
+        />
       </Routes>
     </div>
   )

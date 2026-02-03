@@ -584,3 +584,24 @@ select option {
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
+
+
+/*// Auth*/
+
+.authWrap {
+    min-height: calc(100vh - 48px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.authCard {
+    width: 100%;
+    max-width: 800px;
+}
+
+
+/*// Header*/
+
+.topbar { display: flex; align-items: center; justify-content: space-between; }
+.topbar__actions { display: flex; align-items: center; gap: 8px; }
