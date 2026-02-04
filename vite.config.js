@@ -12,8 +12,11 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.VITE_API_BASE_URL, // e.g. http://localhost:3030
           changeOrigin: true,
-          // /api/users -> /api/backoffice/users
-          rewrite: (path) => path.replace(/^\/api(\/|$)/, '/api/backoffice$1'),
+          rewrite: (path) =>
+            path.replace(
+              /^\/api(\/|$)/,
+              '/api/backoffice/segmentation$1'
+            ),
         },
       },
     },
