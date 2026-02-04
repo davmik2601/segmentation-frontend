@@ -159,6 +159,9 @@ export default function SegmentsPage() {
               value={String(timeRangeDays)}
               onChange={e => setTimeRangeDays(e.target.value)}
               min="1"
+              style={{
+                backgroundColor: 'rgba(227,227,227,0.2)',
+              }}
             />
           </div>
         </div>
@@ -214,6 +217,9 @@ export default function SegmentsPage() {
                       value={seg._afterMinutes}
                       onChange={e => updateSeg(seg.id, {_afterMinutes: e.target.value})}
                       placeholder="e.g. 1501"
+                      style={{
+                        backgroundColor: 'rgba(227,227,227,0.2)',
+                      }}
                     />
                     <div className="hint">Optional. If empty, backend keeps default.</div>
                   </div>
@@ -230,6 +236,9 @@ export default function SegmentsPage() {
                       value={seg._fromNR}
                       onChange={e => updateSeg(seg.id, {_fromNR: e.target.value})}
                       placeholder="optional"
+                      style={{
+                        backgroundColor: 'rgba(227,227,227,0.2)',
+                      }}
                     />
                   </div>
 
@@ -241,6 +250,9 @@ export default function SegmentsPage() {
                       value={seg._toNR}
                       onChange={e => updateSeg(seg.id, {_toNR: e.target.value})}
                       placeholder="optional"
+                      style={{
+                        backgroundColor: 'rgba(227,227,227,0.2)',
+                      }}
                     />
                   </div>
 
