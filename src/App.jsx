@@ -9,6 +9,7 @@ import {api} from './lib/api.js'
 import {uid} from './lib/uid.js'
 import {getAccessToken} from './lib/auth.js'
 import AuthPage from './components/AuthPage.jsx'
+import SegmentsPage from './components/SegmentsPage.jsx'
 
 function RequireAuth({children}) {
   const token = getAccessToken()
@@ -136,47 +137,46 @@ function TagsPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand__title">Tags</div>
-          <div className="brand__subtitle">Create / edit rules & groups</div>
-        </div>
-        <div className="topbar__actions">
-          <button className="btn btn--ghost" onClick={() => navigate('/users')}>
-            Users
-          </button>
-          <button className="btn" onClick={loadTags} disabled={loading}>Refresh</button>
-        </div>
-      </header>
-
-      <main className="grid">
-        <section className="card">
-          <div className="card__header">
-            <div className="card__title">{mode === 'edit' ? 'Edit tag' : 'Create tag'}</div>
-            {mode === 'edit' && (
-              <button className="btn btn--ghost" onClick={cancelEdit}>Cancel edit</button>
-            )}
+      <div className="stack">
+        <header className="row row--space">
+          <div className="brand">
+            <div className="brand__title">Tags</div>
+            <div className="brand__subtitle">Create / edit rules & groups</div>
           </div>
-
-          {err && <div className="alert alert--error">{err}</div>}
-
-          <TagBuilder
-            mode={mode}
-            initialState={mode === 'edit' ? editingTag : initialCreateState}
-            onCreate={onCreate}
-            onUpdate={onUpdate}
-          />
-        </section>
-
-        <section className="card">
-          <div className="card__header">
-            <div className="card__title">Your tags</div>
-            <div className="pill">{loading ? 'Loading…' : `${tags.length} items`}</div>
+          <div className="row row--gap">
+            <button className="btn" onClick={loadTags} disabled={loading}>Refresh</button>
           </div>
+        </header>
 
-          <TagList tags={tags} onEdit={startEdit} onDelete={onDelete}/>
-        </section>
-      </main>
+        <main className="grid">
+          <section className="card">
+            <div className="card__header">
+              <div className="card__title">{mode === 'edit' ? 'Edit tag' : 'Create tag'}</div>
+              {mode === 'edit' && (
+                <button className="btn btn--ghost" onClick={cancelEdit}>Cancel edit</button>
+              )}
+            </div>
+
+            {err && <div className="alert alert--error">{err}</div>}
+
+            <TagBuilder
+              mode={mode}
+              initialState={mode === 'edit' ? editingTag : initialCreateState}
+              onCreate={onCreate}
+              onUpdate={onUpdate}
+            />
+          </section>
+
+          <section className="card">
+            <div className="card__header">
+              <div className="card__title">Your tags</div>
+              <div className="pill">{loading ? 'Loading…' : `${tags.length} items`}</div>
+            </div>
+
+            <TagList tags={tags} onEdit={startEdit} onDelete={onDelete}/>
+          </section>
+        </main>
+      </div>
     </>
   )
 }
@@ -185,27 +185,33 @@ function UsersPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useSearchParams()
   const page = Number(search.get('page') || 0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   return (
     <>
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand__title">Users</div>
-          <div className="brand__subtitle">Segments & tags</div>
-        </div>
-        <div className="topbar__actions">
-          <button className="btn btn--ghost" onClick={() => navigate('/tags')}>Tags</button>
-        </div>
-      </header>
+      <div className="stack">
+        <header className="row row--space">
+          <div className="brand">
+            <div className="brand__title">Users</div>
+            <div className="brand__subtitle">Segments & tags</div>
+          </div>
+          <div className="row row--gap">
+            <button className="btn" onClick={() => setRefreshKey(x => x + 1)}>
+              Refresh
+            </button>
+          </div>
+        </header>
 
-      <section className="card">
-        <UsersWithSegmentsAndTags
-          prefix="gtestbet"
-          page={page}
-          onPageChange={(p) => setSearch({page: String(p)})}
-          onOpenUser={(u) => navigate(`/users/${u.id}/history`)}
-        />
-      </section>
+        <section className="card">
+          <UsersWithSegmentsAndTags
+            prefix="gtestbet"
+            page={page}
+            refreshKey={refreshKey}
+            onPageChange={(p) => setSearch({page: String(p)})}
+            onOpenUser={(u) => navigate(`/users/${u.id}/history`)}
+          />
+        </section>
+      </div>
     </>
   )
 }
@@ -217,23 +223,23 @@ function HistoryPage() {
 
   return (
     <>
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand__title">History</div>
-          <div className="brand__subtitle">User #{userId}</div>
-        </div>
-        <div className="topbar__actions">
-          <button className="btn btn--ghost" onClick={() => navigate('/users')}>Users</button>
-          <button className="btn btn--ghost" onClick={() => navigate('/tags')}>Tags</button>
-        </div>
-      </header>
+      <div className="stack">
+        <header className="row row--space">
+          <div className="brand">
+            <div className="brand__title">History</div>
+            <div className="brand__subtitle">User #{userId}</div>
+          </div>
+          <div className="topbar__actions">
+          </div>
+        </header>
 
-      <section className="card">
-        <UserHistoryCharts
-          user={{id: userId}}
-          onBack={() => navigate('/users')}
-        />
-      </section>
+        <section className="card">
+          <UserHistoryCharts
+            user={{id: userId}}
+            onBack={() => navigate('/users')}
+          />
+        </section>
+      </div>
     </>
   )
 }
@@ -259,6 +265,17 @@ export default function App() {
             <RequireAuth>
               <ProtectedLayout>
                 <TagsPage/>
+              </ProtectedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/segments"
+          element={
+            <RequireAuth>
+              <ProtectedLayout>
+                <SegmentsPage/>
               </ProtectedLayout>
             </RequireAuth>
           }

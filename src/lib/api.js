@@ -83,4 +83,17 @@ export const api = {
       (to !== undefined && to !== null ? `&to=${encodeURIComponent(to)}` : '') +
       `&limit=${limit}&offset=${offset}`,
     ),
+
+  getSegments: () =>
+    req(`/api/segments?prefix=${encodeURIComponent(API_PREFIX)}`),
+
+  setupSegments: ({timeRangeDays, configs}) =>
+    req('/api/segments/setup', {
+      method: 'POST',
+      body: {
+        prefix: API_PREFIX,
+        timeRangeDays,
+        configs,
+      },
+    }),
 }
