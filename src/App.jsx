@@ -55,6 +55,7 @@ function TagsPage() {
 
   const initialCreateState = useMemo(() => ({
     name: '',
+    color: '#e5e7eb',
     active: 1,
     persistent: 0,
     groups: [
@@ -86,6 +87,7 @@ function TagsPage() {
     const normalized = {
       id: tag.id,
       name: tag.name ?? '',
+      color: tag.color ?? '#e5e7eb',
       active: Number(tag.active ?? 0) ? 1 : 0,
       persistent: Number(tag.persistent ?? 0) ? 1 : 0,
       groups: (tag.groups ?? []).map((g, gi) => ({
