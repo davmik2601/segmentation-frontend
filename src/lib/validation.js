@@ -38,7 +38,6 @@ export function validateTagPayload(payload) {
   const errors = []
 
   if (!payload || typeof payload !== 'object') errors.push('payload must be an object')
-  if (!payload.prefix || payload.prefix !== 'gtestbet') errors.push('prefix must be "gtestbet"')
   if (!payload.name || !String(payload.name).trim()) errors.push('name is required')
 
   if (![0, 1].includes(Number(payload.active ?? 0))) errors.push('active must be 0 or 1')

@@ -1,9 +1,23 @@
 import {clearAccessToken, getAccessToken} from './auth.js'
 
+const isLocal = import.meta.env.VITE_ENV === 'local'
+
 const BASE = '' // because vite proxy routes /api/backoffice
 export const API_PREFIX = 'gtestbet' // for local development use 'gtestbet'
 
+function withPrefix(method, body) {
+  if (!isLocal) return body
+
+  if (method.toUpperCase() === 'GET') {
+    return {...body, prefix: API_PREFIX}
+  }
+
+  return {...body, prefix: API_PREFIX}
+}
+
 async function req(path, {method = 'GET', body} = {}) {
+  body = withPrefix(method, body)
+
   let url = `${BASE}${path}`
 
   // if GET and body exists → treat body as query params
@@ -18,7 +32,7 @@ async function req(path, {method = 'GET', body} = {}) {
       }
     }
     const qs = params.toString()
-    if (qs) url += `?${qs}`
+    if (qs) url += (url.includes('?') ? `&${qs}` : `?${qs}`)
     body = undefined
   }
 
@@ -60,38 +74,36 @@ async function req(path, {method = 'GET', body} = {}) {
 }
 
 export const api = {
-  listTags: () => req(`/api/tags?prefix=${encodeURIComponent(API_PREFIX)}`),
+  listTags: () => req(`/api/tags`),
 
   createTag: (payload) =>
-    req('/api/tags/create', {method: 'POST', body: {...payload, prefix: API_PREFIX}}),
+    req('/api/tags/create', {method: 'POST', body: {...payload}}),
 
   updateTag: (id, payload) =>
-    req('/api/tags/update', {method: 'POST', body: {id, ...payload, prefix: API_PREFIX}}),
+    req('/api/tags/update', {method: 'POST', body: {id, ...payload}}),
 
   deleteTag: (id) =>
-    req('/api/tags/delete', {method: 'POST', body: {id, prefix: API_PREFIX}}),
+    req('/api/tags/delete', {method: 'POST', body: {id}}),
 
   getUsersWithSegmentsAndTags: ({limit, offset}) =>
-    req(`/api/users/segments-and-tags?prefix=${encodeURIComponent(API_PREFIX)}&limit=${limit}&offset=${offset}`),
+    req(`/api/users/segments-and-tags?limit=${limit}&offset=${offset}`),
 
   getUserHistory: ({userId, from, to, limit = 5000, offset = 0}) =>
     req(
       `/api/users/history?` +
-      `prefix=${encodeURIComponent(API_PREFIX)}` +
-      `&userId=${encodeURIComponent(userId)}` +
+      `userId=${encodeURIComponent(userId)}` +
       `&from=${encodeURIComponent(from)}` +
       (to !== undefined && to !== null ? `&to=${encodeURIComponent(to)}` : '') +
       `&limit=${limit}&offset=${offset}`,
     ),
 
   getSegments: () =>
-    req(`/api/segments?prefix=${encodeURIComponent(API_PREFIX)}`),
+    req(`/api/segments`),
 
   setupSegments: ({timeRangeDays, configs}) =>
     req('/api/segments/setup', {
       method: 'POST',
       body: {
-        prefix: API_PREFIX,
         timeRangeDays,
         configs,
       },

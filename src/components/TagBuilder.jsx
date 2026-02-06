@@ -149,7 +149,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
   const previewPayload = useMemo(() => {
     // build payload exactly for backend (no _id)
     const payload = {
-      prefix: 'gtestbet',
       name: state.name ?? '',
       active: Number(state.active ?? 0) ? 1 : 0,
       persistent: Number(state.persistent ?? 0) ? 1 : 0,
@@ -493,10 +492,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
       </div>
 
       <div className="row row--space">
-        <div className="hint">
-          Prefix is always <b>gtestbet</b>. Description & color are ignored.
-        </div>
-
         <button type="button" className="btn btn--primary" onClick={submit} disabled={submitting}>
           {submitting ? 'Submitting…' : (isEdit ? 'Update' : 'Create')}
         </button>

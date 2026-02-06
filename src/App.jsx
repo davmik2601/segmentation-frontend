@@ -54,7 +54,6 @@ function TagsPage() {
   }, [])
 
   const initialCreateState = useMemo(() => ({
-    prefix: 'gtestbet',
     name: '',
     active: 1,
     persistent: 0,
@@ -86,7 +85,6 @@ function TagsPage() {
     setMode('edit')
     const normalized = {
       id: tag.id,
-      prefix: 'gtestbet',
       name: tag.name ?? '',
       active: Number(tag.active ?? 0) ? 1 : 0,
       persistent: Number(tag.persistent ?? 0) ? 1 : 0,
@@ -204,7 +202,6 @@ function UsersPage() {
 
         <section className="card">
           <UsersWithSegmentsAndTags
-            prefix="gtestbet"
             page={page}
             refreshKey={refreshKey}
             onPageChange={(p) => setSearch({page: String(p)})}

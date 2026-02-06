@@ -23,7 +23,7 @@ function Badge({text, color, muted, description}) {
   )
 }
 
-export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, onOpenUser, page, onPageChange, refreshKey}) {
+export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPageChange, refreshKey}) {
   const [users, setUsers] = useState([])
   const [meta, setMeta] = useState({count: 0})
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,7 @@ export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, o
     setLoading(true)
     setErr(null)
     try {
-      const res = await api.getUsersWithSegmentsAndTags({prefix, limit, offset})
+      const res = await api.getUsersWithSegmentsAndTags({limit, offset})
       setUsers(res?.users ?? [])
       setMeta(res?.meta ?? {count: 0})
     } catch (e) {
