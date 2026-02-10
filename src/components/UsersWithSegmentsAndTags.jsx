@@ -23,7 +23,7 @@ function Badge({text, color, muted, description}) {
   )
 }
 
-export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, onOpenUser, page, onPageChange}) {
+export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPageChange, refreshKey}) {
   const [users, setUsers] = useState([])
   const [meta, setMeta] = useState({count: 0})
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,7 @@ export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, o
     setLoading(true)
     setErr(null)
     try {
-      const res = await api.getUsersWithSegmentsAndTags({prefix, limit, offset})
+      const res = await api.getUsersWithSegmentsAndTags({limit, offset})
       setUsers(res?.users ?? [])
       setMeta(res?.meta ?? {count: 0})
     } catch (e) {
@@ -57,16 +57,14 @@ export default function UsersWithSegmentsAndTags({prefix = 'gtestbet', onBack, o
     localStorage.setItem('ui:usersPage', String(page))
   }, [page])
 
+  useEffect(() => {
+    if (refreshKey === undefined) return
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
+
   return (
     <div className="stack">
-      <div className="row row--space">
-        <div className="sectionTitle">Users with segments & tags</div>
-        <div className="row row--gap">
-          <button className="btn btn--ghost" onClick={onBack}>Back</button>
-          <button className="btn" onClick={load} disabled={loading}>Refresh</button>
-        </div>
-      </div>
-
       {err && <div className="alert alert--error">{err}</div>}
 
       <div className="tableWrap">

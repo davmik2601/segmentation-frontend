@@ -38,11 +38,16 @@ export function validateTagPayload(payload) {
   const errors = []
 
   if (!payload || typeof payload !== 'object') errors.push('payload must be an object')
-  if (!payload.prefix || payload.prefix !== 'gtestbet') errors.push('prefix must be "gtestbet"')
   if (!payload.name || !String(payload.name).trim()) errors.push('name is required')
 
   if (![0, 1].includes(Number(payload.active ?? 0))) errors.push('active must be 0 or 1')
   if (![0, 1].includes(Number(payload.persistent ?? 0))) errors.push('persistent must be 0 or 1')
+
+  if (payload.color != null) {
+    const c = String(payload.color).trim()
+    const ok = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(c)
+    if (!ok) errors.push('color must be a hex like #eeeeee')
+  }
 
   if (!Array.isArray(payload.groups) || !payload.groups.length) errors.push('at least 1 group is required')
 

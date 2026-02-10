@@ -55,6 +55,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     setState(s => ({...s, persistent}))
   }
 
+  function setColor(color) {
+    setState(s => ({...s, color}))
+  }
+
   function addGroup() {
     setState(s => {
       const groups = [...(s.groups ?? [])]
@@ -149,8 +153,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
   const previewPayload = useMemo(() => {
     // build payload exactly for backend (no _id)
     const payload = {
-      prefix: 'gtestbet',
       name: state.name ?? '',
+      color: (state.color && String(state.color).trim())
+        ? String(state.color).trim().toLowerCase()
+        : null,
       active: Number(state.active ?? 0) ? 1 : 0,
       persistent: Number(state.persistent ?? 0) ? 1 : 0,
       groups: (state.groups ?? []).map((g, gi) => ({
@@ -220,6 +226,15 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             value={state.name ?? ''}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. Potential Asshole 6014"
+          />
+        </div>
+
+        <div className="row row--gap" style={{alignItems: 'center'}}>
+          <input
+            type="color"
+            value={state.color || '#e5e7eb'}
+            onChange={e => setColor(e.target.value)}
+            style={{height: 36, width: 48, padding: 0, border: 'none', background: 'transparent'}}
           />
         </div>
 
@@ -493,10 +508,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
       </div>
 
       <div className="row row--space">
-        <div className="hint">
-          Prefix is always <b>gtestbet</b>. Description & color are ignored.
-        </div>
-
         <button type="button" className="btn btn--primary" onClick={submit} disabled={submitting}>
           {submitting ? 'Submitting…' : (isEdit ? 'Update' : 'Create')}
         </button>
