@@ -398,10 +398,16 @@ export default function SegmentStatisticsCharts({refreshKey}) {
               .filter(p => Number(p.y) > 0)
 
             const options = {
-              chart: {type: 'pie', height: 320, backgroundColor: 'transparent'},
+              chart: {
+                type: 'pie',
+                height: 320,
+                backgroundColor: 'transparent',
+                spacing: [12, 24, 12, 24]
+              },
               title: {text: `Bucket #${idx + 1} — ${metricLabel}`},
               subtitle: {text: fmtRange(b.from, b.to)},
               tooltip: {
+                outside: true,
                 formatter: function () {
                   return `<b>${this.point.y}</b> (${this.point.percentage.toFixed(1)}%)`
                 },
@@ -410,8 +416,14 @@ export default function SegmentStatisticsCharts({refreshKey}) {
                 pie: {
                   allowPointSelect: true,
                   cursor: 'pointer',
+                  size: '50%',
+                  center: ['50%', '50%'],
+                  minSize: 200,
                   dataLabels: {
                     enabled: true,
+                    distance: 15,
+                    overflow: 'allow',
+                    crop: false,
                     // borderWidth: 0,
                     color: '#ffffff',
                     backgroundColor: 'none',
