@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.jsx'
 import TagBuilder from './components/TagBuilder.jsx'
 import TagList from './components/TagList.jsx'
 import UsersWithSegmentsAndTags from './components/UsersWithSegmentsAndTags.jsx'
+import SegmentStatisticsCharts from './components/SegmentStatisticsCharts.jsx'
 import UserHistoryCharts from './components/UserHistoryCharts.jsx'
 import {api} from './lib/api.js'
 import {uid} from './lib/uid.js'
@@ -33,8 +34,6 @@ function TagsPage() {
 
   const [mode, setMode] = useState('create')
   const [editingTag, setEditingTag] = useState(null)
-
-  const navigate = useNavigate()
 
   async function loadTags() {
     setLoading(true)
@@ -201,6 +200,15 @@ function UsersPage() {
             </button>
           </div>
         </header>
+
+        <section className="card">
+          <div className="card__header">
+            <div className="card__title">Segment statistics</div>
+            <div className="card__subtitle">By interval and buckets</div>
+          </div>
+
+          <SegmentStatisticsCharts refreshKey={refreshKey} />
+        </section>
 
         <section className="card">
           <UsersWithSegmentsAndTags

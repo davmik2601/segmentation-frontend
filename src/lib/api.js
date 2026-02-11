@@ -108,4 +108,13 @@ export const api = {
         configs,
       },
     }),
+
+  getSegmentStatistics: ({from, to, buckets}) =>
+    req('/api/statistics/segments', {
+      body: {
+        ...(from !== undefined && from !== null ? {from} : {}),
+        ...(to !== undefined && to !== null ? {to} : {}),
+        buckets,
+      },
+    }),
 }
