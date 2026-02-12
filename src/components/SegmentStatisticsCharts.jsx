@@ -20,7 +20,23 @@ function fmtRange(fromSec, toSec) {
   return `${a} → ${b}`
 }
 
-const BUCKET_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16]
+function getAllowedIntervalsForRange({fromMs, toMs}) {
+  const toSec = toMs != null ? Math.floor(toMs / 1000) : Math.floor(Date.now() / 1000)
+  const fromSec = fromMs != null ? Math.floor(fromMs / 1000) : (toSec - 180 * 24 * 3600) // same default as BE
+
+  // if invalid range, allow everything (or none). Better UX: allow everything and let Apply show error.
+  if (fromSec >= toSec) return new Set(INTERVAL_OPTIONS)
+
+  const rangeDays = (toSec - fromSec) / 86400
+
+  if (rangeDays <= 2) return new Set(['6h', '12h', 'day', 'week', 'month', 'year'])
+  if (rangeDays <= 31) return new Set(['day', 'week', 'month', 'year'])
+  if (rangeDays <= 183) return new Set(['week', 'month', 'year'])
+  if (rangeDays <= 730) return new Set(['month', 'year'])
+  return new Set(['year'])
+}
+
+const INTERVAL_OPTIONS = ['6h', '12h', 'day', 'week', 'month', 'year']
 
 export default function SegmentStatisticsCharts({refreshKey}) {
   const nowMs = Date.now()
@@ -31,12 +47,13 @@ export default function SegmentStatisticsCharts({refreshKey}) {
   // applied (used for request + charts)
   const [appliedFromMs, setAppliedFromMs] = useState(defaultFromMs)
   const [appliedToMs, setAppliedToMs] = useState(null)
-  const [appliedBuckets, setAppliedBuckets] = useState(3)
+
+  const [appliedIntervals, setAppliedIntervals] = useState(null)
+  const [draftIntervals, setDraftIntervals] = useState(null)
 
   // draft (UI only)
   const [draftFromMs, setDraftFromMs] = useState(defaultFromMs)
   const [draftToMs, setDraftToMs] = useState(null)
-  const [draftBuckets, setDraftBuckets] = useState(3)
 
   // metric selector (no refetch needed)
   const [metric, setMetric] = useState('usersCount') // usersCount | userTimeSeconds | avgUsers
@@ -46,14 +63,14 @@ export default function SegmentStatisticsCharts({refreshKey}) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState(null)
   const [data, setData] = useState(null)
-  const [openBucketIndex, setOpenBucketIndex] = useState(null)
+  const [openIntervalIndex, setOpenIntervalIndex] = useState(null)
 
   async function load() {
     setLoading(true)
     setErr(null)
     try {
       const res = await api.getSegmentStatistics({
-        buckets: appliedBuckets,
+        ...(appliedIntervals ? {interval: appliedIntervals} : {}),
         ...(appliedFromMs !== null ? {from: toUnixSeconds(appliedFromMs)} : {}),
         ...(appliedToMs !== null ? {to: toUnixSeconds(appliedToMs)} : {}),
       })
@@ -79,17 +96,16 @@ export default function SegmentStatisticsCharts({refreshKey}) {
   }, [refreshKey])
 
   function apply() {
+    setAppliedIntervals(draftIntervals)
     setAppliedFromMs(draftFromMs)
     setAppliedToMs(draftToMs)
-    setAppliedBuckets(draftBuckets)
 
-    // load using the next applied values (avoid waiting state update)
     ;(async () => {
       setLoading(true)
       setErr(null)
       try {
         const res = await api.getSegmentStatistics({
-          buckets: draftBuckets,
+          ...(draftIntervals ? {interval: draftIntervals} : {}),
           ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
           ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
         })
@@ -102,7 +118,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
     })()
   }
 
-  const buckets = Array.isArray(data?.buckets) ? data.buckets : []
+  const intervals = Array.isArray(data?.intervals) ? data.intervals : []
 
   const metricLabel = useMemo(() => {
     if (metric === 'userTimeSeconds') return 'Time spent (seconds)'
@@ -116,17 +132,17 @@ export default function SegmentStatisticsCharts({refreshKey}) {
     return Number(s.usersCount ?? 0)
   }
 
-  function buildChart({type, height, buckets, metricLabel}) {
+  function buildChart({type, height, intervals, metricLabel}) {
     if (type === 'bar') {
-      // categories = buckets, series = segments (stacked)
-      const categories = buckets.map((b, i) => `#${i + 1}`)
-      const bucketSubtitles = buckets.map(b => fmtRange(b.from, b.to))
+      // categories = intervals, series = segments (stacked)
+      const categories = intervals.map((b, i) => `#${i + 1}`)
+      const intervalSubtitles = intervals.map(b => fmtRange(b.from, b.to))
 
-      // collect all segments across all buckets
+      // collect all segments across all intervals
       /** @type {Map<string, {name: string, color?: string}>} */
       const segMap = new Map()
 
-      for (const b of buckets) {
+      for (const b of intervals) {
         const stats = Array.isArray(b.statistics) ? b.statistics : []
         for (const s of stats) {
           const id = s?.segment?.id
@@ -141,9 +157,9 @@ export default function SegmentStatisticsCharts({refreshKey}) {
         }
       }
 
-      // series per segment: value per bucket
+      // series per segment: value per interval
       const series = Array.from(segMap.entries()).map(([key, meta]) => {
-        const data = buckets.map(b => {
+        const data = intervals.map(b => {
           const stats = Array.isArray(b.statistics) ? b.statistics : []
           const s = stats.find(x => {
             const id = x?.segment?.id
@@ -163,8 +179,8 @@ export default function SegmentStatisticsCharts({refreshKey}) {
 
       return {
         chart: {type: 'column', height, backgroundColor: '#f2f2f2'},
-        title: {text: `Buckets — ${metricLabel}`},
-        subtitle: {text: 'Each column is a bucket (stacked by segments)'},
+        title: {text: `Intervals — ${metricLabel}`},
+        subtitle: {text: 'Each column is a interval (stacked by segments)'},
         xAxis: {
           categories,
           labels: {
@@ -183,25 +199,25 @@ export default function SegmentStatisticsCharts({refreshKey}) {
           gridLineColor: '#d6d6d6',
         },
         tooltip: {
-          /** For shared tooltip (all segments in the bucket) */
+          /** For shared tooltip (all segments in the interval) */
           shared: true,
           formatter: function () {
             const i = this.points?.[0]?.point?.index ?? 0
-            const range = bucketSubtitles[i] || ''
-            let s = `<b>Bucket #${i + 1}</b><br/>${range}<br/><br/>`
+            const range = intervalSubtitles[i] || ''
+            let s = `<b>Interval #${i + 1}</b><br/>${range}<br/><br/>`
             for (const p of (this.points || [])) {
               s += `<span style="color: ${p.series.color}">${p.series.name}:</span> <b>${p.y}</b> (${p.percentage.toFixed(2)})<br/>`
             }
             return s
           },
 
-          /** For individual tooltip (single segment in the bucket) */
+          /** For individual tooltip (single segment in the interval) */
           // formatter: function () {
           //   const i = this.point?.index ?? 0
-          //   const range = bucketSubtitles[i] || ''
+          //   const range = intervalSubtitles[i] || ''
           //   const pct = (this.point.percentage ?? 0).toFixed(2)
           //   return `
-          //     <b>Bucket #${i + 1}</b><br/>${range}<br/><br/>
+          //     <b>Interval #${i + 1}</b><br/>${range}<br/><br/>
           //     <span style="color: ${this.series.color}">${this.series.name}:</span>
           //     <b>${this.y}</b> (${pct}%)
           //   `
@@ -213,14 +229,28 @@ export default function SegmentStatisticsCharts({refreshKey}) {
             borderWidth: 0,
           },
         },
-        series: series.length ? series : [{type: 'column', name: 'No data', data: buckets.map(() => 1)}],
+        series: series.length ? series : [{type: 'column', name: 'No data', data: intervals.map(() => 1)}],
         credits: {enabled: false},
       }
     }
 
-    // default pie (single bucket only). For multi-bucket pies, you already render multiple charts.
+    // default pie (single interval only). For multi-interval pies, you already render multiple charts.
     return null
   }
+
+  const allowedIntervals = useMemo(() => {
+    return getAllowedIntervalsForRange({fromMs: draftFromMs, toMs: draftToMs})
+  }, [draftFromMs, draftToMs])
+
+  useEffect(() => {
+    if (draftIntervals && !allowedIntervals.has(draftIntervals)) {
+      setDraftIntervals(null)
+    }
+    if (appliedIntervals && !allowedIntervals.has(appliedIntervals)) {
+      setAppliedIntervals(null)
+    }
+  }, [allowedIntervals]) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   return (
     <div className="stack">
@@ -228,7 +258,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
 
       <div className="row row--space" style={{alignItems: 'flex-end', gap: 12, flexWrap: 'wrap'}}>
         <div className="stack stack--tight" style={{minWidth: 320}}>
-          <div className="label">Interval</div>
+          <div className="label">Period</div>
           <div className="row row--gap" style={{alignItems: 'center', flexWrap: 'wrap'}}>
             <DateRangePicker
               fromMs={draftFromMs}
@@ -262,42 +292,48 @@ export default function SegmentStatisticsCharts({refreshKey}) {
         </div>
 
         <div className="stack stack--tight">
-          <div className="label">Buckets</div>
-          <div className="switch" role="tablist" aria-label="Buckets">
-            {BUCKET_OPTIONS.map(n => (
-              <button
-                key={n}
-                type="button"
-                className={`switch__btn ${draftBuckets === n ? 'is-active' : ''}`}
-                onClick={() => {
-                  setDraftBuckets(n)
+          <div className="label">Intervals</div>
+          <div className="switch" role="tablist" aria-label="Intervals">
+            {INTERVAL_OPTIONS.map(n => {
+              const disabled = !allowedIntervals.has(n)
 
-                  // request immediately with new buckets + current draft range
-                  setAppliedBuckets(n)
-                  setAppliedFromMs(draftFromMs)
-                  setAppliedToMs(draftToMs)
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={disabled}
+                  className={`switch__btn ${draftIntervals === n ? 'is-active' : ''}`}
+                  title={disabled ? 'Not allowed for selected range' : undefined}
+                  onClick={() => {
+                    if (disabled) return
 
-                  ;(async () => {
-                    setLoading(true)
-                    setErr(null)
-                    try {
-                      const res = await api.getSegmentStatistics({
-                        buckets: n,
-                        ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
-                        ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
-                      })
-                      setData(res || null)
-                    } catch (e) {
-                      setErr(e?.message || String(e))
-                    } finally {
-                      setLoading(false)
-                    }
-                  })()
-                }}
-              >
-                {n}
-              </button>
-            ))}
+                    setDraftIntervals(n)
+                    setAppliedIntervals(n)
+                    setAppliedFromMs(draftFromMs)
+                    setAppliedToMs(draftToMs)
+
+                    ;(async () => {
+                      setLoading(true)
+                      setErr(null)
+                      try {
+                        const res = await api.getSegmentStatistics({
+                          interval: n,
+                          ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
+                          ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
+                        })
+                        setData(res || null)
+                      } catch (e) {
+                        setErr(e?.message || String(e))
+                      } finally {
+                        setLoading(false)
+                      }
+                    })()
+                  }}
+                >
+                  {n}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -332,7 +368,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
           <button className="btn btn--primary" onClick={apply} disabled={loading}>
             Apply
           </button>
-          <div className="pill">{loading ? 'Loading…' : `${buckets.length} bucket(s)`}</div>
+          <div className="pill">{loading ? 'Loading…' : `${intervals.length} interval(s)`}</div>
         </div>
 
         <div className="stack stack--tight">
@@ -362,9 +398,9 @@ export default function SegmentStatisticsCharts({refreshKey}) {
           style={{padding: 12, cursor: 'pointer'}}
           role="button"
           tabIndex={0}
-          onClick={() => setOpenBucketIndex(-1)}
+          onClick={() => setOpenIntervalIndex(-1)}
           onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') setOpenBucketIndex(-1)
+            if (e.key === 'Enter' || e.key === ' ') setOpenIntervalIndex(-1)
           }}
           title="Click to expand"
         >
@@ -373,7 +409,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
             options={buildChart({
               type: 'bar',
               height: 420,
-              buckets,
+              intervals,
               metricLabel,
             })}
           />
@@ -386,7 +422,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
             gap: 12,
           }}
         >
-          {buckets.map((b, idx) => {
+          {intervals.map((b, idx) => {
             const stats = Array.isArray(b.statistics) ? b.statistics : []
 
             const points = stats
@@ -402,9 +438,9 @@ export default function SegmentStatisticsCharts({refreshKey}) {
                 type: 'pie',
                 height: 320,
                 backgroundColor: 'transparent',
-                spacing: [12, 24, 12, 24]
+                spacing: [12, 24, 12, 24],
               },
-              title: {text: `Bucket #${idx + 1} — ${metricLabel}`},
+              title: {text: `Interval #${idx + 1} — ${metricLabel}`},
               subtitle: {text: fmtRange(b.from, b.to)},
               tooltip: {
                 outside: true,
@@ -444,9 +480,9 @@ export default function SegmentStatisticsCharts({refreshKey}) {
                 style={{padding: 12, cursor: 'pointer'}}
                 role="button"
                 tabIndex={0}
-                onClick={() => setOpenBucketIndex(idx)}
+                onClick={() => setOpenIntervalIndex(idx)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') setOpenBucketIndex(idx)
+                  if (e.key === 'Enter' || e.key === ' ') setOpenIntervalIndex(idx)
                 }}
                 title="Click to expand"
               >
@@ -457,14 +493,14 @@ export default function SegmentStatisticsCharts({refreshKey}) {
         </div>
       )}
 
-      {!loading && !buckets.length && (
+      {!loading && !intervals.length && (
         <div className="empty">No statistics yet.</div>
       )}
 
-      {openBucketIndex !== null && (
+      {openIntervalIndex !== null && (
         <div
           className="modalOverlay"
-          onClick={() => setOpenBucketIndex(null)}
+          onClick={() => setOpenIntervalIndex(null)}
           role="presentation"
         >
           <div
@@ -475,33 +511,33 @@ export default function SegmentStatisticsCharts({refreshKey}) {
           >
             <div className="modal__header">
               <div className="modal__title">
-                {chartType === 'bar' || openBucketIndex === -1
-                  ? 'Buckets (expanded)'
-                  : `Bucket #${openBucketIndex + 1}`}
+                {chartType === 'bar' || openIntervalIndex === -1
+                  ? 'Intervals (expanded)'
+                  : `Interval #${openIntervalIndex + 1}`}
               </div>
               <button
                 style={{color: 'black'}}
                 className="btn btn--ghost btn--small"
-                onClick={() => setOpenBucketIndex(null)}
+                onClick={() => setOpenIntervalIndex(null)}
               >
                 Close
               </button>
             </div>
 
             <div className="modal__body">
-              {chartType === 'bar' || openBucketIndex === -1 ? (
+              {chartType === 'bar' || openIntervalIndex === -1 ? (
                 <HighchartsReact
                   highcharts={Highcharts}
                   options={buildChart({
                     type: 'bar',
                     height: 700,
-                    buckets,
+                    intervals,
                     metricLabel,
                   })}
                 />
               ) : (
                 (() => {
-                  const b = buckets[openBucketIndex]
+                  const b = intervals[openIntervalIndex]
                   const stats = Array.isArray(b?.statistics) ? b.statistics : []
 
                   const points = stats
@@ -514,7 +550,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
 
                   const bigOptions = {
                     chart: {type: 'pie', height: 620, backgroundColor: 'transparent'},
-                    title: {text: `Bucket #${openBucketIndex + 1} — ${metricLabel}`},
+                    title: {text: `Interval #${openIntervalIndex + 1} — ${metricLabel}`},
                     subtitle: {text: fmtRange(b.from, b.to)},
                     tooltip: {
                       formatter: function () {

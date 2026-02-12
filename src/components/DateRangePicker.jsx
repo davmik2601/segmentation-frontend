@@ -25,12 +25,31 @@ export default function DateRangePicker({
   const ref = useRef(null)
   const [open, setOpen] = useState(false)
 
+  function toDateOnly(ms) {
+    const d = new Date(ms)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+
+  const todayDateOnly = useMemo(() => toDateOnly(Date.now()), [])
+
+  const prevMonthFirstDay = useMemo(() => {
+    const t = new Date()
+    return new Date(t.getFullYear(), t.getMonth() - 1, 1)
+  }, [])
+
   const selected = useMemo(() => {
-    return {
-      from: fromMs != null ? new Date(fromMs) : undefined,
-      to: toMs != null ? new Date(toMs) : undefined,
-    }
-  }, [fromMs, toMs])
+    const from = fromMs != null ? toDateOnly(fromMs) : undefined
+
+    // IMPORTANT:
+    // if user selected "from" but "to" is null (meaning "to = now"),
+    // highlight range up to today in the picker UI.
+    const to =
+      from
+        ? (toMs != null ? toDateOnly(toMs) : todayDateOnly)
+        : undefined
+
+    return {from, to}
+  }, [fromMs, toMs, todayDateOnly])
 
   // close on outside click
   useEffect(() => {
@@ -76,9 +95,12 @@ export default function DateRangePicker({
             mode="range"
             numberOfMonths={months}
             pagedNavigation
+            defaultMonth={prevMonthFirstDay}
             classNames={{
               months: 'rdp-months--inline',
             }}
+            disabled={{after: todayDateOnly}}
+            toDate={todayDateOnly}
             selected={selected}
             onSelect={range => {
               const f = range?.from ? startOfDayMs(range.from) : null

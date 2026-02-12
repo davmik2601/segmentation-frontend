@@ -204,7 +204,7 @@ function UsersPage() {
         <section className="card">
           <div className="card__header">
             <div className="card__title">Segment statistics</div>
-            <div className="card__subtitle">By interval and buckets</div>
+            <div className="card__subtitle">By period and intervals</div>
           </div>
 
           <SegmentStatisticsCharts refreshKey={refreshKey} />
