@@ -12,31 +12,69 @@ function toUnixSeconds(ms) {
   return Math.floor(ms / 1000)
 }
 
+function intervalParam(interval) {
+  // do not send interval when "no" (or null)
+  if (!interval || interval === 'no') return {}
+  return {interval}
+}
+
 function fmtRange(fromSec, toSec) {
-  const fromMs = Number(fromSec) * 1000
-  const toMs = Number(toSec) * 1000
-  const a = Number.isFinite(fromMs) ? new Date(fromMs).toLocaleString() : ''
-  const b = Number.isFinite(toMs) ? new Date(toMs).toLocaleString() : ''
-  return `${a} → ${b}`
+  const format = sec => {
+    const d = new Date(Number(sec) * 1000)
+    if (!Number.isFinite(d.getTime())) return ''
+
+    const pad = n => String(n).padStart(2, '0')
+
+    return (
+      `${d.getFullYear()}/` +
+      `${pad(d.getMonth() + 1)}/` +
+      `${pad(d.getDate())}, ` +
+      `${pad(d.getHours())}:` +
+      `${pad(d.getMinutes())}:` +
+      `${pad(d.getSeconds())}`
+    )
+  }
+
+  return `${format(fromSec)} → ${format(toSec)}`
 }
 
 function getAllowedIntervalsForRange({fromMs, toMs}) {
-  const toSec = toMs != null ? Math.floor(toMs / 1000) : Math.floor(Date.now() / 1000)
-  const fromSec = fromMs != null ? Math.floor(fromMs / 1000) : (toSec - 180 * 24 * 3600) // same default as BE
+  const to = toMs != null ? Math.floor(toMs / 1000) : Math.floor(Date.now() / 1000)
+  const from = fromMs != null ? Math.floor(fromMs / 1000) : (to - 180 * 24 * 3600) // same default as BE
 
-  // if invalid range, allow everything (or none). Better UX: allow everything and let Apply show error.
-  if (fromSec >= toSec) return new Set(INTERVAL_OPTIONS)
+  // BE: if from >= to => validation error. In UI, show everything so user can fix range.
+  if (from >= to) return new Set(INTERVAL_OPTIONS)
 
-  const rangeDays = (toSec - fromSec) / 86400
+  const rangeDays = (to - from) / 86400
 
-  if (rangeDays <= 2) return new Set(['6h', '12h', 'day', 'week', 'month', 'year'])
-  if (rangeDays <= 31) return new Set(['day', 'week', 'month', 'year'])
-  if (rangeDays <= 183) return new Set(['week', 'month', 'year'])
-  if (rangeDays <= 730) return new Set(['month', 'year'])
-  return new Set(['year'])
+  /** @type {string[]} */
+  let allowed = []
+
+  if (rangeDays < 0.25) { // < 6 hours
+    allowed = []
+  } else if (rangeDays < 0.5) { // < 12 hours
+    allowed = ['6h']
+  } else if (rangeDays < 1) { // < 24 hours
+    allowed = ['6h', '12h']
+  } else if (rangeDays < 3) {
+    allowed = ['6h', '12h', 'day']
+  } else if (rangeDays < 7) {
+    allowed = ['12h', 'day']
+  } else if (rangeDays < 31) {
+    allowed = ['day', 'week']
+  } else if (rangeDays <= 183) { // ~6 months
+    allowed = ['week', 'month']
+  } else if (rangeDays <= 730) { // ~2 years
+    allowed = ['month', 'year']
+  } else {
+    allowed = ['year']
+  }
+
+  // BE: "no" is always allowed (it exits before checking allowed)
+  return new Set(['no', ...allowed])
 }
 
-const INTERVAL_OPTIONS = ['6h', '12h', 'day', 'week', 'month', 'year']
+const INTERVAL_OPTIONS = ['no', '6h', '12h', 'day', 'week', 'month', 'year']
 
 export default function SegmentStatisticsCharts({refreshKey}) {
   const nowMs = Date.now()
@@ -48,8 +86,8 @@ export default function SegmentStatisticsCharts({refreshKey}) {
   const [appliedFromMs, setAppliedFromMs] = useState(defaultFromMs)
   const [appliedToMs, setAppliedToMs] = useState(null)
 
-  const [appliedIntervals, setAppliedIntervals] = useState(null)
-  const [draftIntervals, setDraftIntervals] = useState(null)
+  const [appliedIntervals, setAppliedIntervals] = useState('no')
+  const [draftIntervals, setDraftIntervals] = useState('no')
 
   // draft (UI only)
   const [draftFromMs, setDraftFromMs] = useState(defaultFromMs)
@@ -70,7 +108,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
     setErr(null)
     try {
       const res = await api.getSegmentStatistics({
-        ...(appliedIntervals ? {interval: appliedIntervals} : {}),
+        ...intervalParam(appliedIntervals),
         ...(appliedFromMs !== null ? {from: toUnixSeconds(appliedFromMs)} : {}),
         ...(appliedToMs !== null ? {to: toUnixSeconds(appliedToMs)} : {}),
       })
@@ -105,7 +143,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
       setErr(null)
       try {
         const res = await api.getSegmentStatistics({
-          ...(draftIntervals ? {interval: draftIntervals} : {}),
+          ...intervalParam(draftIntervals),
           ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
           ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
         })
@@ -243,13 +281,10 @@ export default function SegmentStatisticsCharts({refreshKey}) {
   }, [draftFromMs, draftToMs])
 
   useEffect(() => {
-    if (draftIntervals && !allowedIntervals.has(draftIntervals)) {
-      setDraftIntervals(null)
-    }
-    if (appliedIntervals && !allowedIntervals.has(appliedIntervals)) {
-      setAppliedIntervals(null)
-    }
-  }, [allowedIntervals]) // eslint-disable-line react-hooks/exhaustive-deps
+    // whenever date range changes → reset interval to "no"
+    setDraftIntervals('no')
+    setAppliedIntervals('no')
+  }, [draftFromMs, draftToMs]) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (
@@ -294,46 +329,42 @@ export default function SegmentStatisticsCharts({refreshKey}) {
         <div className="stack stack--tight">
           <div className="label">Intervals</div>
           <div className="switch" role="tablist" aria-label="Intervals">
-            {INTERVAL_OPTIONS.map(n => {
-              const disabled = !allowedIntervals.has(n)
+            {INTERVAL_OPTIONS
+              .filter(n => allowedIntervals.has(n))
+              .map(n => {
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`switch__btn ${draftIntervals === n ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setDraftIntervals(n)
+                      setAppliedIntervals(n)
+                      setAppliedFromMs(draftFromMs)
+                      setAppliedToMs(draftToMs)
 
-              return (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={disabled}
-                  className={`switch__btn ${draftIntervals === n ? 'is-active' : ''}`}
-                  title={disabled ? 'Not allowed for selected range' : undefined}
-                  onClick={() => {
-                    if (disabled) return
-
-                    setDraftIntervals(n)
-                    setAppliedIntervals(n)
-                    setAppliedFromMs(draftFromMs)
-                    setAppliedToMs(draftToMs)
-
-                    ;(async () => {
-                      setLoading(true)
-                      setErr(null)
-                      try {
-                        const res = await api.getSegmentStatistics({
-                          interval: n,
-                          ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
-                          ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
-                        })
-                        setData(res || null)
-                      } catch (e) {
-                        setErr(e?.message || String(e))
-                      } finally {
-                        setLoading(false)
-                      }
-                    })()
-                  }}
-                >
-                  {n}
-                </button>
-              )
-            })}
+                      ;(async () => {
+                        setLoading(true)
+                        setErr(null)
+                        try {
+                          const res = await api.getSegmentStatistics({
+                            ...intervalParam(n),
+                            ...(draftFromMs !== null ? {from: toUnixSeconds(draftFromMs)} : {}),
+                            ...(draftToMs !== null ? {to: toUnixSeconds(draftToMs)} : {}),
+                          })
+                          setData(res || null)
+                        } catch (e) {
+                          setErr(e?.message || String(e))
+                        } finally {
+                          setLoading(false)
+                        }
+                      })()
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              })}
           </div>
         </div>
 
@@ -440,8 +471,8 @@ export default function SegmentStatisticsCharts({refreshKey}) {
                 backgroundColor: 'transparent',
                 spacing: [12, 24, 12, 24],
               },
-              title: {text: `Interval #${idx + 1} — ${metricLabel}`},
-              subtitle: {text: fmtRange(b.from, b.to)},
+              title: {text: `${fmtRange(b.from, b.to)}`, style: {color: '#bdcbc1'},},
+              subtitle: {text: `Interval #${idx + 1}`, style: {color: '#38bb3b'},},
               tooltip: {
                 outside: true,
                 formatter: function () {
