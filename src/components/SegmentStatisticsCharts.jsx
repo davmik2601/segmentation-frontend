@@ -19,23 +19,27 @@ function intervalParam(interval) {
 }
 
 function fmtRange(fromSec, toSec) {
-  const format = sec => {
-    const d = new Date(Number(sec) * 1000)
-    if (!Number.isFinite(d.getTime())) return ''
+  const fromMs = Number(fromSec) * 1000
+  const toMs = Number(toSec) * 1000
 
-    const pad = n => String(n).padStart(2, '0')
+  const format = ms =>
+    Number.isFinite(ms)
+      ? new Date(ms).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'UTC', // force UTC
+      })
+      : ''
 
-    return (
-      `${d.getFullYear()}/` +
-      `${pad(d.getMonth() + 1)}/` +
-      `${pad(d.getDate())}, ` +
-      `${pad(d.getHours())}:` +
-      `${pad(d.getMinutes())}:` +
-      `${pad(d.getSeconds())}`
-    )
-  }
+  const a = format(fromMs)
+  const b = format(toMs)
 
-  return `${format(fromSec)} → ${format(toSec)}`
+  return `${a} → ${b}`
 }
 
 function getAllowedIntervalsForRange({fromMs, toMs}) {
