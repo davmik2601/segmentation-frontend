@@ -50,7 +50,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .page {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 24px;
 }
@@ -670,4 +670,69 @@ select option {
     .segmentsGrid {
         grid-template-columns: 1fr;
     }
+}
+
+
+
+/*   MODAL */
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 9999;
+}
+
+.modal {
+    width: min(1100px, 96vw);
+    max-height: 92vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.modal__title {
+    font-weight: 700;
+}
+
+.modal__body {
+    padding: 12px 14px 16px;
+}
+
+
+/*  Day Picker */
+/* DayPicker theme override */
+/* react-day-picker v9 range colors */
+.rdp-root {
+    --rdp-accent-color: #2563eb;
+    --rdp-accent-background-color: #2563eb;
+
+    --rdp-range_middle-background-color: #dbeafe; /* middle days bg */
+    --rdp-range_middle-color: #111;              /* middle days text */
+
+    --rdp-range_start-background: #2563eb;
+    --rdp-range_start-color: #fff;
+
+    --rdp-range_end-background: #2563eb;
+    --rdp-range_end-color: #fff;
+}
+
+/* make 2 months show in one horizontal row */
+.rdp-months--inline {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;
 }
