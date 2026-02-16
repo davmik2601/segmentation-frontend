@@ -3,6 +3,7 @@ import {api} from '../lib/api.js'
 import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import 'highcharts/modules/xrange'
+import DateTimeRangePicker from './DateTimeRangePicker.jsx'
 
 Highcharts.setOptions({
   time: {useUTC: false},
@@ -32,18 +33,6 @@ function normalizeCreatedAtToMs(createdAt) {
 
   // if you ever send ms in future
   return Math.round(n)
-}
-
-function toLocalInputValue(ms) {
-  const d = new Date(ms)
-  const pad = n => String(n).padStart(2, '0')
-  return (
-    d.getFullYear() + '-' +
-    pad(d.getMonth() + 1) + '-' +
-    pad(d.getDate()) + 'T' +
-    pad(d.getHours()) + ':' +
-    pad(d.getMinutes())
-  )
 }
 
 /**
@@ -438,25 +427,42 @@ export default function UserHistoryCharts({user, onBack}) {
 
       {err && <div className="alert alert--error">{err}</div>}
 
-      <div className="grid2">
-        <div className="field">
-          <div className="label">From</div>
-          <input
-            className="input"
-            type="datetime-local"
-            value={draftFromMs ? toLocalInputValue(draftFromMs) : ''}
-            onChange={e => setDraftFromMs(e.target.value ? new Date(e.target.value).getTime() : null)}
-          />
-        </div>
+      <div className="row row--space" style={{alignItems: 'flex-end', gap: 12, flexWrap: 'wrap'}}>
+        <div className="stack stack--tight" style={{minWidth: 340}}>
+          <div className="label">Period</div>
 
-        <div className="field">
-          <div className="label">To</div>
-          <input
-            className="input"
-            type="datetime-local"
-            value={draftToMs ? toLocalInputValue(draftToMs) : ''}
-            onChange={e => setDraftToMs(e.target.value ? new Date(e.target.value).getTime() : null)}
-          />
+          <div className="row row--gap" style={{alignItems: 'center', flexWrap: 'wrap'}}>
+            <DateTimeRangePicker
+              fromMs={draftFromMs}
+              toMs={draftToMs}
+              onChange={({fromMs, toMs}) => {
+                setDraftFromMs(fromMs)
+                setDraftToMs(toMs)
+              }}
+              onDone={() => {
+                // apply + refresh (same behavior style as Statistics Done)
+                setAppliedFromMs(draftFromMs)
+                setAppliedToMs(draftToMs)
+                setTimeout(load, 0)
+              }}
+              placeholder="Select date & time range"
+              months={2}
+            />
+
+            <button
+              className="btn btn--ghost btn--small"
+              onClick={() => {
+                setDraftFromMs(null)
+                setDraftToMs(null)
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="mutedSmall">
+            Applied: {appliedFromMs ? new Date(appliedFromMs).toLocaleString(undefined, {hour12: false}) : '—'} → {appliedToMs ? new Date(appliedToMs).toLocaleString(undefined, {hour12: false}) : 'now'}
+          </div>
         </div>
       </div>
 

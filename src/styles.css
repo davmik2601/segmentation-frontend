@@ -49,6 +49,12 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     filter: invert(1) brightness(1.2);
 }
 
+/* hide the native time-picker icon (clock) */
+input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+}
+
 .page {
     max-width: 1800px;
     margin: 0 auto;
