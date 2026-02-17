@@ -142,7 +142,6 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
   const [err, setErr] = useState(null)
 
   // filters
-  const [filterUserId, setFilterUserId] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
   const [segmentIds, setSegmentIds] = useState([]) // numbers
   const [tagIds, setTagIds] = useState([]) // numbers
@@ -151,7 +150,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
   const [segments, setSegments] = useState([])
   const [tags, setTags] = useState([])
 
-  const limit = 20
+  const limit = 50
   const offset = page * limit
 
   const pageCount = useMemo(() => {
@@ -191,7 +190,6 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
       const res = await api.getUsersWithSegmentsAndTags({
         limit,
         offset,
-        userId: filterUserId ? Number(filterUserId) : undefined,
         search: filterSearch || undefined,
         segmentIds: segmentIds.length ? segmentIds.join(',') : undefined,
         tagIds: tagIds.length ? tagIds.join(',') : undefined,
@@ -205,6 +203,29 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
       setLoading(false)
     }
   }
+
+  const Pagination = (
+    <div className="row row--space">
+      <div className="mutedSmall">
+        Total: <b>{Number(meta?.count ?? 0)}</b> • Page <b>{page + 1}</b> / <b>{pageCount}</b>
+        {loading ? <span> • loading…</span> : null}
+      </div>
+
+      <div className="row row--gap">
+        <button className="btn" onClick={() => onPageChange(Math.max(0, page - 1))} disabled={page === 0 || loading}>
+          Prev
+        </button>
+
+        <button
+          className="btn"
+          onClick={() => onPageChange(page + 1 < pageCount ? page + 1 : page)}
+          disabled={page + 1 >= pageCount || loading}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  )
 
   // fetch segments + active tags once
   useEffect(() => {
@@ -231,14 +252,14 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
   // main load: page + filters (debounced for typing)
   useEffect(() => {
     const ctrl = new AbortController()
-    const t = setTimeout(() => load({signal: ctrl.signal}), 250)
+    const t = setTimeout(() => load({signal: ctrl.signal}), 400)
     localStorage.setItem('ui:usersPage', String(page))
     return () => {
       ctrl.abort()
       clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterUserId, filterSearch, segmentIds.join(','), tagIds.join(',')])
+  }, [page, filterSearch, segmentIds.join(','), tagIds.join(',')])
 
   // external refresh
   useEffect(() => {
@@ -255,26 +276,13 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
     <div className="stack">
       {err && <div className="alert alert--error">{err}</div>}
 
-      <div className="card" style={{padding: 12}}>
+      <div className="card" style={{padding: 12, backgroundColor: '#252e42', border: '1px solid grey'}}>
         <div className="row row--space" style={{alignItems: 'flex-start', gap: 12, flexWrap: 'wrap'}}>
-          <div className="field" style={{minWidth: 140}}>
-            <div className="label">User ID</div>
-            <input
-              className="input"
-              placeholder="e.g. 123"
-              value={filterUserId}
-              onChange={e => {
-                setFilterUserId(e.target.value.replace(/[^\d]/g, ''))
-                resetToFirstPage()
-              }}
-            />
-          </div>
-
-          <div className="field" style={{minWidth: 260, flex: 1}}>
+          <div className="field" style={{minWidth: 380, maxWidth: 500, flex: '0.6 1 auto'}}>
             <div className="label">Search</div>
             <input
               className="input"
-              placeholder="email / username"
+              placeholder="ID / email / username"
               value={filterSearch}
               onChange={e => {
                 setFilterSearch(e.target.value)
@@ -283,7 +291,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
             />
           </div>
 
-          <div className="field" style={{minWidth: 200}}>
+          <div className="field" style={{minWidth: 200, flex: '0 0 auto'}}>
             <div className="label">Segments</div>
             <MultiSelectPopover
               label="Select segments"
@@ -301,7 +309,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
             )}
           </div>
 
-          <div className="field" style={{minWidth: 200}}>
+          <div className="field" style={{minWidth: 200, flex: '0 0 auto'}}>
             <div className="label">Tags</div>
             <MultiSelectPopover
               label="Select tags"
@@ -319,12 +327,11 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
             )}
           </div>
 
-          <div className="field" style={{minWidth: 120}}>
+          <div className="field" style={{minWidth: 120, flex: '0 0 auto', marginLeft: 'auto'}}>
             <div className="label">&nbsp;</div>
             <button
               className="btn btn--ghost"
               onClick={() => {
-                setFilterUserId('')
                 setFilterSearch('')
                 setSegmentIds([])
                 setTagIds([])
@@ -340,6 +347,8 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
           Tip: include <b>0</b> in segments/tags to include users with no segment/tags.
         </div>
       </div>
+
+      {Pagination}
 
       <div className="tableWrap">
         <table className="table">
@@ -410,26 +419,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
         </table>
       </div>
 
-      <div className="row row--space">
-        <div className="mutedSmall">
-          Total: <b>{Number(meta?.count ?? 0)}</b> • Page <b>{page + 1}</b> / <b>{pageCount}</b>
-          {loading ? <span> • loading…</span> : null}
-        </div>
-
-        <div className="row row--gap">
-          <button className="btn" onClick={() => onPageChange(Math.max(0, page - 1))} disabled={page === 0 || loading}>
-            Prev
-          </button>
-
-          <button
-            className="btn"
-            onClick={() => onPageChange(page + 1 < pageCount ? page + 1 : page)}
-            disabled={page + 1 >= pageCount || loading}
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      {Pagination}
     </div>
   )
 }
