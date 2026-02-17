@@ -119,43 +119,69 @@ function buildTagIntervals(history, fromMs, toMs) {
  * We treat any history item that has segmentId as a "set segment".
  */
 function buildSegmentIntervals(history, fromMs, toMs) {
+  const noSegment = {id: 0, name: 'No segment', color: 'rgba(255,255,255,0.10)'}
+
   const sorted = [...history]
     .filter(h => h.segmentId !== undefined && h.segmentId !== null)
     .sort((a, b) => normalizeCreatedAtToMs(a.createdAt) - normalizeCreatedAtToMs(b.createdAt))
 
+  // determine state at "fromMs" using events BEFORE from
+  let current = noSegment
+  for (const h of sorted) {
+    const ms = normalizeCreatedAtToMs(h.createdAt)
+    if (ms >= fromMs) break
+
+    const kind = actionKind(h.action)
+    if (kind === 'add') {
+      current = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    } else if (kind === 'remove') {
+      // segment unset => no segment after this
+      current = noSegment
+    }
+  }
+
   const intervals = []
-  let open = null // {segment, startMs}
+  let openStartMs = fromMs
 
   for (const h of sorted) {
     const ms = normalizeCreatedAtToMs(h.createdAt)
-    const seg = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    if (ms < fromMs) continue
+    if (ms > toMs) break
 
-    if (!open) {
-      open = {segment: seg, startMs: ms}
-      continue
+    const kind = actionKind(h.action)
+
+    // close current interval at event time
+    if (ms > openStartMs) {
+      intervals.push({
+        name: current?.name || String(current?.id ?? ''),
+        color: current?.color || null,
+        startMs: openStartMs,
+        endMs: ms,
+        realStartMs: openStartMs,
+        realEndMs: ms,
+      })
     }
 
-    // close previous
-    intervals.push({
-      name: open.segment?.name || String(open.segment?.id),
-      color: open.segment?.color || null,
-      startMs: Math.max(open.startMs, fromMs),
-      endMs: Math.min(ms, toMs),
-      realStartMs: open.startMs,
-      realEndMs: ms,
-    })
+    // update state
+    if (kind === 'add') {
+      current = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    } else if (kind === 'remove') {
+      current = noSegment
+    } else {
+      // unknown action => ignore state change
+    }
 
-    // open new
-    open = {segment: seg, startMs: ms}
+    openStartMs = ms
   }
 
-  if (open) {
+  // close tail to "toMs"
+  if (toMs > openStartMs) {
     intervals.push({
-      name: open.segment?.name || String(open.segment?.id),
-      color: open.segment?.color || null,
-      startMs: Math.max(open.startMs, fromMs),
+      name: current?.name || String(current?.id ?? ''),
+      color: current?.color || null,
+      startMs: openStartMs,
       endMs: toMs,
-      realStartMs: open.startMs,
+      realStartMs: openStartMs,
       realEndMs: toMs,
     })
   }
