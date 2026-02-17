@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react'
+import {toast} from 'react-toastify'
 import {api} from '../lib/api.js'
 
 function toNumOrNull(v) {
@@ -137,6 +138,7 @@ export default function SegmentsPage() {
     const errors = validationErrors
     if (errors.length) {
       setErr(errors.join('\n'))
+      toast.error(errors[0] || 'Please fix validation errors')
       return
     }
 
@@ -168,8 +170,12 @@ export default function SegmentsPage() {
 
       await api.setupSegments({timeRangeDays: tr, configs})
       await load()
+
+      toast.success('Segments saved')
     } catch (e) {
-      setErr(e?.message || String(e))
+      const msg = e?.message || String(e)
+      setErr(msg)
+      toast.error(`Failed to save segments: ${msg}`)
     } finally {
       setSaving(false)
     }
