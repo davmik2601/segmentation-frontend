@@ -74,7 +74,7 @@ async function req(path, {method = 'GET', body} = {}) {
 }
 
 export const api = {
-  listTags: () => req(`/api/tags`),
+  listTags: (params) => req('/api/tags', {body: params}),
 
   createTag: (payload) =>
     req('/api/tags/create', {method: 'POST', body: {...payload}}),
@@ -85,8 +85,17 @@ export const api = {
   deleteTag: (id) =>
     req('/api/tags/delete', {method: 'POST', body: {id}}),
 
-  getUsersWithSegmentsAndTags: ({limit, offset}) =>
-    req(`/api/users/segments-and-tags?limit=${limit}&offset=${offset}`),
+  getUsersWithSegmentsAndTags: ({limit, offset, userId, search, segmentIds, tagIds}) =>
+    req('/api/users/segments-and-tags', {
+      body: {
+        limit,
+        offset,
+        ...(userId !== undefined && userId !== null && userId !== '' ? {userId} : {}),
+        ...(search ? {search} : {}),
+        ...(segmentIds ? {segmentIds} : {}), // comma-separated: "0,1,3"
+        ...(tagIds ? {tagIds} : {}),         // comma-separated: "0,4,5"
+      },
+    }),
 
   getUserHistory: ({userId, from, to, limit = 5000, offset = 0}) =>
     req(
