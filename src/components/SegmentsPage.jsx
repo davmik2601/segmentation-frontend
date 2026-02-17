@@ -59,40 +59,76 @@ export default function SegmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function isAllowedFixedZero(seg, key) {
+    const slug = String(seg?.slug || '')
+    // fixed zero boundary:
+    // - winners: first boundary is winner_low.toNR = 0
+    if (key === 'toNR' && slug === 'net_winner_low') return true
+    // - losers: first boundary is loser_low.fromNR = 0
+    if (key === 'fromNR' && slug === 'net_loser_low') return true
+    return false
+  }
+
   const validationErrors = useMemo(() => {
     const errors = []
 
     const tr = toNumOrNull(timeRangeDays)
     if (tr === null || tr <= 0) errors.push('timeRangeDays must be a number > 0')
 
+    // afterMinutes must be > 0
     segments.forEach(seg => {
-      if (seg._kind === 'afterMinutes') {
-        const afterMinutes = toNumOrNull(seg._afterMinutes)
-        if (afterMinutes === null || afterMinutes <= 0) {
-          errors.push(`Segment "${seg.name}" (${seg.slug}): afterMinutes must be a number > 0`)
-        }
-        return
-      }
-
-      if (seg._kind !== 'nrRange') return
-
-      const fromNR = toNumOrNull(seg._fromNR)
-      const toNR = toNumOrNull(seg._toNR)
-
-      // must set at least one (and it must be > 0 in UI terms)
-      if (fromNR === null && toNR === null) {
-        errors.push(`Segment "${seg.name}" (${seg.slug}): set fromNR or toNR`)
-        return
-      }
-
-      // forbid 0 (and any non-positive)
-      if (fromNR !== null && fromNR === 0) {
-        errors.push(`Segment "${seg.name}" (${seg.slug}): fromNR cannot be 0`)
-      }
-      if (toNR !== null && toNR === 0) {
-        errors.push(`Segment "${seg.name}" (${seg.slug}): toNR cannot be 0`)
+      if (seg._kind !== 'afterMinutes') return
+      const afterMinutes = toNumOrNull(seg._afterMinutes)
+      if (afterMinutes === null || afterMinutes <= 0) {
+        errors.push(`Segment "${seg.name}" (${seg.slug}): afterMinutes must be a number > 0`)
       }
     })
+
+    // validate NR boundaries by chain (this is the important part)
+    const winners = segments.slice(3, 7)
+    const losers = segments.slice(7, 12)
+
+    function isPosNumberString(s) {
+      if (s === '' || s === null || s === undefined) return false
+      const n = Number(s)
+      return Number.isFinite(n) && Math.abs(n) > 0
+    }
+
+    // WINNERS: boundary between seg[i] and seg[i+1] is seg[i]._fromNR (e.g. low.from=-1000)
+    for (let i = 0; i < winners.length - 1; i++) {
+      const seg = winners[i]
+      const raw = seg?._fromNR
+
+      if (!isPosNumberString(raw)) {
+        errors.push(`Segment "${seg.name}" (${seg.slug}): boundary cannot be empty/0`)
+        continue
+      }
+
+      const n = Number(raw)
+      if (n === 0) {
+        errors.push(`Segment "${seg.name}" (${seg.slug}): boundary cannot be 0`)
+      }
+    }
+
+    // LOSERS: boundary between seg[i] and seg[i+1] is seg[i]._toNR (e.g. low.to=1000)
+    for (let i = 0; i < losers.length - 1; i++) {
+      const seg = losers[i]
+      const raw = seg?._toNR
+
+      if (!isPosNumberString(raw)) {
+        errors.push(`Segment "${seg.name}" (${seg.slug}): boundary cannot be empty/0`)
+        continue
+      }
+
+      const n = Number(raw)
+      if (n === 0) {
+        errors.push(`Segment "${seg.name}" (${seg.slug}): boundary cannot be 0`)
+      }
+    }
+
+    // allow fixed zeros (these are disabled in UI; do not validate them as >0)
+    // - net_winner_low.toNR = 0
+    // - net_loser_low.fromNR = 0
 
     return errors
   }, [segments, timeRangeDays])
@@ -119,8 +155,12 @@ export default function SegmentsPage() {
           const fromNR = toNumOrNull(seg._fromNR)
           const toNR = toNumOrNull(seg._toNR)
 
-          if (fromNR !== null && fromNR !== 0) options.fromNR = fromNR
-          if (toNR !== null && toNR !== 0) options.toNR = toNR
+          if (fromNR !== null && (fromNR !== 0 || isAllowedFixedZero(seg, 'fromNR'))) {
+            options.fromNR = fromNR
+          }
+          if (toNR !== null && (toNR !== 0 || isAllowedFixedZero(seg, 'toNR'))) {
+            options.toNR = toNR
+          }
         }
 
         return {segmentId: seg.id, options}
