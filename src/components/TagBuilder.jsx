@@ -1,5 +1,4 @@
 import React, {useEffect, useMemo, useState} from 'react'
-import {toast} from 'react-toastify'
 import {uid} from '../lib/uid.js'
 import {ENUMS} from '../lib/enums.js'
 import {normalizeRuleByBusinessRules, validateTagPayload} from '../lib/validation.js'
@@ -188,7 +187,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     const v = validateTagPayload(previewPayload)
     if (!v.ok) {
       setErrors(v.errors)
-      toast.error(v.errors?.[0] || 'Please fix validation errors')
       return
     }
 
@@ -197,17 +195,13 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     try {
       if (isEdit) {
         await onUpdate(state.id, previewPayload)
-        toast.success('Tag updated')
       } else {
         await onCreate(previewPayload)
-        toast.success('Tag created')
         // reset form after create
         setState(deepClone(initialState))
       }
     } catch (e) {
-      const msg = e?.message || String(e)
-      setErrors([msg])
-      toast.error(`Failed to ${isEdit ? 'update' : 'create'} tag: ${msg}`)
+      setErrors([e?.message || String(e)])
     } finally {
       setSubmitting(false)
     }

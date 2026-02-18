@@ -11,8 +11,6 @@ import {uid} from './lib/uid.js'
 import {getAccessToken} from './lib/auth.js'
 import AuthPage from './components/AuthPage.jsx'
 import SegmentsPage from './components/SegmentsPage.jsx'
-import {ToastContainer} from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 
 function RequireAuth({children}) {
   const token = getAccessToken()
@@ -25,14 +23,6 @@ function ProtectedLayout({children}) {
     <>
       <AppHeader/>
       {children}
-
-      <ToastContainer
-        position="bottom-right"
-        autoClose={2500}
-        closeOnClick
-        pauseOnHover
-        draggable
-      />
     </>
   )
 }
@@ -217,7 +207,7 @@ function UsersPage() {
             <div className="card__subtitle">By period and intervals</div>
           </div>
 
-          <SegmentStatisticsCharts refreshKey={refreshKey}/>
+          <SegmentStatisticsCharts refreshKey={refreshKey} />
         </section>
 
         <section className="card">

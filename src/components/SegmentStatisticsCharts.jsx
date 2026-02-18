@@ -475,11 +475,8 @@ export default function SegmentStatisticsCharts({refreshKey}) {
                 backgroundColor: 'transparent',
                 spacing: [12, 24, 12, 24],
               },
-              title: {text: `${fmtRange(b.from, b.to)}`, style: {color: '#bdcbc1'}},
-              subtitle: {
-                text: `Interval #${idx + 1} • <span style="color: #64b445">Total users: <b style="color: #4df124">${Number(b.totalUsers ?? 0)}</b></span>`,
-                style: {color: '#38bb3b'},
-              },
+              title: {text: `${fmtRange(b.from, b.to)}`, style: {color: '#bdcbc1'},},
+              subtitle: {text: `Interval #${idx + 1}`, style: {color: '#38bb3b'},},
               tooltip: {
                 outside: true,
                 formatter: function () {
