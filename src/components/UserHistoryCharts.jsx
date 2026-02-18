@@ -3,6 +3,7 @@ import {api} from '../lib/api.js'
 import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import 'highcharts/modules/xrange'
+import DateTimeRangePicker from './DateTimeRangePicker.jsx'
 
 Highcharts.setOptions({
   time: {useUTC: false},
@@ -32,18 +33,6 @@ function normalizeCreatedAtToMs(createdAt) {
 
   // if you ever send ms in future
   return Math.round(n)
-}
-
-function toLocalInputValue(ms) {
-  const d = new Date(ms)
-  const pad = n => String(n).padStart(2, '0')
-  return (
-    d.getFullYear() + '-' +
-    pad(d.getMonth() + 1) + '-' +
-    pad(d.getDate()) + 'T' +
-    pad(d.getHours()) + ':' +
-    pad(d.getMinutes())
-  )
 }
 
 /**
@@ -130,43 +119,69 @@ function buildTagIntervals(history, fromMs, toMs) {
  * We treat any history item that has segmentId as a "set segment".
  */
 function buildSegmentIntervals(history, fromMs, toMs) {
+  const noSegment = {id: 0, name: 'No segment', color: 'rgba(255,255,255,0.10)'}
+
   const sorted = [...history]
     .filter(h => h.segmentId !== undefined && h.segmentId !== null)
     .sort((a, b) => normalizeCreatedAtToMs(a.createdAt) - normalizeCreatedAtToMs(b.createdAt))
 
+  // determine state at "fromMs" using events BEFORE from
+  let current = noSegment
+  for (const h of sorted) {
+    const ms = normalizeCreatedAtToMs(h.createdAt)
+    if (ms >= fromMs) break
+
+    const kind = actionKind(h.action)
+    if (kind === 'add') {
+      current = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    } else if (kind === 'remove') {
+      // segment unset => no segment after this
+      current = noSegment
+    }
+  }
+
   const intervals = []
-  let open = null // {segment, startMs}
+  let openStartMs = fromMs
 
   for (const h of sorted) {
     const ms = normalizeCreatedAtToMs(h.createdAt)
-    const seg = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    if (ms < fromMs) continue
+    if (ms > toMs) break
 
-    if (!open) {
-      open = {segment: seg, startMs: ms}
-      continue
+    const kind = actionKind(h.action)
+
+    // close current interval at event time
+    if (ms > openStartMs) {
+      intervals.push({
+        name: current?.name || String(current?.id ?? ''),
+        color: current?.color || null,
+        startMs: openStartMs,
+        endMs: ms,
+        realStartMs: openStartMs,
+        realEndMs: ms,
+      })
     }
 
-    // close previous
-    intervals.push({
-      name: open.segment?.name || String(open.segment?.id),
-      color: open.segment?.color || null,
-      startMs: Math.max(open.startMs, fromMs),
-      endMs: Math.min(ms, toMs),
-      realStartMs: open.startMs,
-      realEndMs: ms,
-    })
+    // update state
+    if (kind === 'add') {
+      current = h.segment || {id: h.segmentId, name: String(h.segmentId), color: null}
+    } else if (kind === 'remove') {
+      current = noSegment
+    } else {
+      // unknown action => ignore state change
+    }
 
-    // open new
-    open = {segment: seg, startMs: ms}
+    openStartMs = ms
   }
 
-  if (open) {
+  // close tail to "toMs"
+  if (toMs > openStartMs) {
     intervals.push({
-      name: open.segment?.name || String(open.segment?.id),
-      color: open.segment?.color || null,
-      startMs: Math.max(open.startMs, fromMs),
+      name: current?.name || String(current?.id ?? ''),
+      color: current?.color || null,
+      startMs: openStartMs,
       endMs: toMs,
-      realStartMs: open.startMs,
+      realStartMs: openStartMs,
       realEndMs: toMs,
     })
   }
@@ -438,25 +453,42 @@ export default function UserHistoryCharts({user, onBack}) {
 
       {err && <div className="alert alert--error">{err}</div>}
 
-      <div className="grid2">
-        <div className="field">
-          <div className="label">From</div>
-          <input
-            className="input"
-            type="datetime-local"
-            value={draftFromMs ? toLocalInputValue(draftFromMs) : ''}
-            onChange={e => setDraftFromMs(e.target.value ? new Date(e.target.value).getTime() : null)}
-          />
-        </div>
+      <div className="row row--space" style={{alignItems: 'flex-end', gap: 12, flexWrap: 'wrap'}}>
+        <div className="stack stack--tight" style={{minWidth: 340}}>
+          <div className="label">Period</div>
 
-        <div className="field">
-          <div className="label">To</div>
-          <input
-            className="input"
-            type="datetime-local"
-            value={draftToMs ? toLocalInputValue(draftToMs) : ''}
-            onChange={e => setDraftToMs(e.target.value ? new Date(e.target.value).getTime() : null)}
-          />
+          <div className="row row--gap" style={{alignItems: 'center', flexWrap: 'wrap'}}>
+            <DateTimeRangePicker
+              fromMs={draftFromMs}
+              toMs={draftToMs}
+              onChange={({fromMs, toMs}) => {
+                setDraftFromMs(fromMs)
+                setDraftToMs(toMs)
+              }}
+              onDone={() => {
+                // apply + refresh (same behavior style as Statistics Done)
+                setAppliedFromMs(draftFromMs)
+                setAppliedToMs(draftToMs)
+                setTimeout(load, 0)
+              }}
+              placeholder="Select date & time range"
+              months={2}
+            />
+
+            <button
+              className="btn btn--ghost btn--small"
+              onClick={() => {
+                setDraftFromMs(null)
+                setDraftToMs(null)
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="mutedSmall">
+            Applied: {appliedFromMs ? new Date(appliedFromMs).toLocaleString(undefined, {hour12: false}) : '—'} → {appliedToMs ? new Date(appliedToMs).toLocaleString(undefined, {hour12: false}) : 'now'}
+          </div>
         </div>
       </div>
 
