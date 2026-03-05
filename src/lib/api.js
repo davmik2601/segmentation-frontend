@@ -1,7 +1,23 @@
-const BASE = '' // because vite proxy routes /api -> http://localhost:3030
-export const API_PREFIX = 'gtestbet'
+import {clearAccessToken, getAccessToken} from './auth.js'
+
+const isLocal = import.meta.env.VITE_ENV === 'local'
+
+const BASE = '' // because vite proxy routes /api/backoffice
+export const API_PREFIX = 'gtestbet' // for local development use 'gtestbet'
+
+function withPrefix(method, body) {
+  if (!isLocal) return body
+
+  if (method.toUpperCase() === 'GET') {
+    return {...body, prefix: API_PREFIX}
+  }
+
+  return {...body, prefix: API_PREFIX}
+}
 
 async function req(path, {method = 'GET', body} = {}) {
+  body = withPrefix(method, body)
+
   let url = `${BASE}${path}`
 
   // if GET and body exists → treat body as query params
@@ -16,15 +32,28 @@ async function req(path, {method = 'GET', body} = {}) {
       }
     }
     const qs = params.toString()
-    if (qs) url += `?${qs}`
+    if (qs) url += (url.includes('?') ? `&${qs}` : `?${qs}`)
     body = undefined
   }
 
+  const token = getAccessToken()
+
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
   const res = await fetch(url, {
     method,
-    headers: body ? {'Content-Type': 'application/json'} : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+
+  if (res.status === 401) {
+    clearAccessToken()
+    // hard redirect so user can't stay on protected pages
+    window.location.assign('/auth')
+    return
+  }
 
   const text = await res.text()
   let data
@@ -45,27 +74,56 @@ async function req(path, {method = 'GET', body} = {}) {
 }
 
 export const api = {
-  listTags: () => req(`/api/tags?prefix=${encodeURIComponent(API_PREFIX)}`),
+  listTags: (params) => req('/api/tags', {body: params}),
 
   createTag: (payload) =>
-    req('/api/tags/create', {method: 'POST', body: {...payload, prefix: API_PREFIX}}),
+    req('/api/tags/create', {method: 'POST', body: {...payload}}),
 
   updateTag: (id, payload) =>
-    req('/api/tags/update', {method: 'POST', body: {id, ...payload, prefix: API_PREFIX}}),
+    req('/api/tags/update', {method: 'POST', body: {id, ...payload}}),
 
   deleteTag: (id) =>
-    req('/api/tags/delete', {method: 'POST', body: {id, prefix: API_PREFIX}}),
+    req('/api/tags/delete', {method: 'POST', body: {id}}),
 
-  getUsersWithSegmentsAndTags: ({limit, offset}) =>
-    req(`/api/users/segments-and-tags?prefix=${encodeURIComponent(API_PREFIX)}&limit=${limit}&offset=${offset}`),
+  getUsersWithSegmentsAndTags: ({limit, offset, userId, search, segmentIds, tagIds}) =>
+    req('/api/users/segments-and-tags', {
+      body: {
+        limit,
+        offset,
+        ...(userId !== undefined && userId !== null && userId !== '' ? {userId} : {}),
+        ...(search ? {search} : {}),
+        ...(segmentIds ? {segmentIds} : {}), // comma-separated: "0,1,3"
+        ...(tagIds ? {tagIds} : {}),         // comma-separated: "0,4,5"
+      },
+    }),
 
   getUserHistory: ({userId, from, to, limit = 5000, offset = 0}) =>
     req(
       `/api/users/history?` +
-      `prefix=${encodeURIComponent(API_PREFIX)}` +
-      `&userId=${encodeURIComponent(userId)}` +
+      `userId=${encodeURIComponent(userId)}` +
       `&from=${encodeURIComponent(from)}` +
       (to !== undefined && to !== null ? `&to=${encodeURIComponent(to)}` : '') +
       `&limit=${limit}&offset=${offset}`,
     ),
+
+  getSegments: () =>
+    req(`/api/segments`),
+
+  setupSegments: ({timeRangeDays, configs}) =>
+    req('/api/segments/setup', {
+      method: 'POST',
+      body: {
+        timeRangeDays,
+        configs,
+      },
+    }),
+
+  getSegmentStatistics: ({from, to, interval}) =>
+    req('/api/statistics/segments', {
+      body: {
+        ...(from !== undefined && from !== null ? {from} : {}),
+        ...(to !== undefined && to !== null ? {to} : {}),
+        interval,
+      },
+    }),
 }

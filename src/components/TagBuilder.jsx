@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react'
+import {toast} from 'react-toastify'
 import {uid} from '../lib/uid.js'
 import {ENUMS} from '../lib/enums.js'
 import {normalizeRuleByBusinessRules, validateTagPayload} from '../lib/validation.js'
@@ -55,6 +56,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     setState(s => ({...s, persistent}))
   }
 
+  function setColor(color) {
+    setState(s => ({...s, color}))
+  }
+
   function addGroup() {
     setState(s => {
       const groups = [...(s.groups ?? [])]
@@ -68,8 +73,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             _id: uid(),
             connector: 'and',
             event: 'deposit',
+            metric: null,
             aggregation: 'some',
-            metric: 'amount',
             operator: 'gte',
             valueFrom: '',
             valueTo: null,
@@ -108,8 +113,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
           _id: uid(),
           connector: 'or',
           event: 'deposit',
+          metric: null,
           aggregation: 'some',
-          metric: 'amount',
           operator: 'gte',
           valueFrom: '',
           valueTo: null,
@@ -149,8 +154,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
   const previewPayload = useMemo(() => {
     // build payload exactly for backend (no _id)
     const payload = {
-      prefix: 'gtestbet',
       name: state.name ?? '',
+      color: (state.color && String(state.color).trim())
+        ? String(state.color).trim().toLowerCase()
+        : null,
       active: Number(state.active ?? 0) ? 1 : 0,
       persistent: Number(state.persistent ?? 0) ? 1 : 0,
       groups: (state.groups ?? []).map((g, gi) => ({
@@ -160,8 +167,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
           const normalized = normalizeRuleByBusinessRules({
             connector: gi === 0 && ri === 0 ? 'and' : (r.connector || 'and'),
             event: r.event,
-            aggregation: r.aggregation,
             metric: r.metric ?? null,
+            aggregation: r.aggregation,
             operator: r.operator,
             valueFrom: r.valueFrom ?? '',
             valueTo: r.valueTo ?? null,
@@ -181,6 +188,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     const v = validateTagPayload(previewPayload)
     if (!v.ok) {
       setErrors(v.errors)
+      toast.error(v.errors?.[0] || 'Please fix validation errors')
       return
     }
 
@@ -189,13 +197,17 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
     try {
       if (isEdit) {
         await onUpdate(state.id, previewPayload)
+        toast.success('Tag updated')
       } else {
         await onCreate(previewPayload)
+        toast.success('Tag created')
         // reset form after create
-        setState(s => ({...deepClone(s), name: ''}))
+        setState(deepClone(initialState))
       }
     } catch (e) {
-      setErrors([e?.message || String(e)])
+      const msg = e?.message || String(e)
+      setErrors([msg])
+      toast.error(`Failed to ${isEdit ? 'update' : 'create'} tag: ${msg}`)
     } finally {
       setSubmitting(false)
     }
@@ -220,6 +232,15 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             value={state.name ?? ''}
             onChange={e => setName(e.target.value)}
             placeholder="e.g. Potential Asshole 6014"
+          />
+        </div>
+
+        <div className="row row--gap" style={{alignItems: 'center'}}>
+          <input
+            type="color"
+            value={state.color || '#e5e7eb'}
+            onChange={e => setColor(e.target.value)}
+            style={{height: 36, width: 48, padding: 0, border: 'none', background: 'transparent'}}
           />
         </div>
 
@@ -311,9 +332,15 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
 
                   // UI behavior similar to your backend refine rules
                   const isLogin = event === 'login'
-                  const metricDisabled = isLogin || aggregation === 'count'
-                  const aggregationDisabled = isLogin
+                  const isNetResult = event === 'net_result'
+                  const isCasino = event === 'casino'
+                  const isSport = event === 'sport'
+                  const isGgr = r.metric === 'ggr'
+                  const metricEnabled = (isCasino || isSport)
                   const forcedAggregation = isLogin ? 'count' : aggregation
+
+                  const aggregationUiValue = (isNetResult || isGgr) ? '' : forcedAggregation
+                  const aggregationUiDisabled = isLogin || isNetResult || isGgr
 
                   const betweenNeedsTo = operator === 'between' || operator === 'not_between'
                   const valueToDisabled = !betweenNeedsTo
@@ -356,20 +383,54 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                             value={event}
                             onChange={e => {
                               const nextEvent = e.target.value
-                              // if login => force aggregation=count, metric=null
+
+                              const nextIsCasinoOrSport = nextEvent === 'casino' || nextEvent === 'sport'
+                              const nextAgg = nextEvent === 'login'
+                                ? 'count'
+                                : (r.aggregation == null || r.aggregation === 'count' ? 'some' : r.aggregation)
+
                               if (nextEvent === 'login') {
                                 updateRule(g._id, r._id, {event: nextEvent, aggregation: 'count', metric: null})
-                              } else {
-                                // if leaving login, restore defaults if missing
-                                updateRule(g._id, r._id, {
-                                  event: nextEvent,
-                                  aggregation: forcedAggregation === 'count' ? 'some' : forcedAggregation,
-                                  metric: 'amount',
-                                })
+                                return
                               }
+
+                              if (nextEvent === 'net_result') {
+                                updateRule(g._id, r._id, {event: nextEvent, aggregation: null, metric: null})
+                                return
+                              }
+
+                              // deposit/withdrawal/other => metric must be null
+                              // casino/sport => metric allowed only when aggregation != count
+                              updateRule(g._id, r._id, {
+                                event: nextEvent,
+                                aggregation: nextAgg,
+                                metric: nextIsCasinoOrSport
+                                  ? (ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet'))
+                                  : null,
+                              })
                             }}
                           >
                             {ENUMS.events.map(x => <option key={x} value={x}>{x}</option>)}
+                          </select>
+                        </div>
+
+
+                        <div className="field">
+                          <div className="label">Metric</div>
+                          <select
+                            className="select"
+                            style={{opacity: metricEnabled ? 1 : 0.3}}
+                            value={metricEnabled ? ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet') : ''}
+                            disabled={!metricEnabled}
+                            onChange={e => updateRule(g._id, r._id, {metric: e.target.value || null})}
+                          >
+                            {!metricEnabled && (
+                              <option value="" disabled>
+                                not allowed
+                              </option>
+                            )}
+
+                            {ENUMS.metrics.map(x => <option key={x} value={x}>{x}</option>)}
                           </select>
                         </div>
 
@@ -377,34 +438,41 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                           <div className="label">Aggregation</div>
                           <select
                             className="select"
-                            value={forcedAggregation}
-                            disabled={aggregationDisabled}
+                            style={{opacity: !aggregationUiDisabled ? 1 : aggregationUiValue !== '' ? 0.6 : 0.3}}
+                            value={aggregationUiValue}
+                            disabled={aggregationUiDisabled}
                             onChange={e => {
                               const nextAgg = e.target.value
-                              // if count => metric=null
+                              const isCasinoOrSport = event === 'casino' || event === 'sport'
+
                               if (nextAgg === 'count') {
-                                updateRule(g._id, r._id, {aggregation: nextAgg, metric: null})
-                              } else {
-                                updateRule(g._id, r._id, {aggregation: nextAgg, metric: r.metric ?? 'amount'})
+                                const isCasinoOrSport = event === 'casino' || event === 'sport'
+                                const fallbackMetric = ENUMS.metrics[0] || 'bet'
+                                updateRule(g._id, r._id, {
+                                  aggregation: nextAgg,
+                                  metric: isCasinoOrSport
+                                    ? (ENUMS.metrics.includes(r.metric) ? r.metric : fallbackMetric)
+                                    : null,
+                                })
+                                return
                               }
+
+                              // metric allowed only for casino/sport, otherwise keep null
+                              updateRule(g._id, r._id, {
+                                aggregation: nextAgg,
+                                metric: isCasinoOrSport
+                                  ? (ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet'))
+                                  : null,
+                              })
                             }}
                           >
-                            {ENUMS.aggregations.map(x => <option key={x} value={x}>{x}</option>)}
-                          </select>
-                        </div>
+                            {(isNetResult || isGgr) && (
+                              <option value="" disabled>
+                                not allowed
+                              </option>
+                            )}
 
-                        <div className="field">
-                          <div className="label">Metric</div>
-                          <select
-                            className="select"
-                            value={metricDisabled ? '' : (r.metric ?? 'amount')}
-                            disabled={metricDisabled}
-                            onChange={e => updateRule(g._id, r._id, {metric: e.target.value || null})}
-                          >
-                            <option value="" disabled>
-                              {metricDisabled ? 'not allowed' : 'select'}
-                            </option>
-                            {ENUMS.metrics.map(x => <option key={x} value={x}>{x}</option>)}
+                            {ENUMS.aggregations.map(x => <option key={x} value={x}>{x}</option>)}
                           </select>
                         </div>
 
@@ -459,7 +527,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                             onChange={e => {
                               const v = e.target.value
                               if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
-                            }}                          />
+                            }}/>
                         </div>
 
                         <div className="field">
@@ -482,11 +550,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         })}
       </div>
 
-      <div className="row row--space">
-        <div className="hint">
-          Prefix is always <b>gtestbet</b>. Description & color are ignored.
-        </div>
-
+      <div className="row row--space" style={{justifyContent: 'flex-end'}}>
         <button type="button" className="btn btn--primary" onClick={submit} disabled={submitting}>
           {submitting ? 'Submitting…' : (isEdit ? 'Update' : 'Create')}
         </button>
