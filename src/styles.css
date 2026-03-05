@@ -153,6 +153,19 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     margin-bottom: 6px;
 }
 
+.periodRow {
+    display: flex;
+    gap: 8px;
+}
+
+.periodRow .input {
+    width: 90px;
+}
+
+.periodRow .select {
+    width: 110px;
+}
+
 .input, .select {
     width: 100%;
     padding: 10px 10px;

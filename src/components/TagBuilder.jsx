@@ -164,7 +164,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         connector: gi === 0 ? 'and' : (g.connector || 'and'),
         sort: gi + 1,
         rules: (g.rules ?? []).map((r, ri) => {
-          const normalized = normalizeRuleByBusinessRules({
+          return normalizeRuleByBusinessRules({
             connector: gi === 0 && ri === 0 ? 'and' : (r.connector || 'and'),
             event: r.event,
             metric: r.metric ?? null,
@@ -176,7 +176,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             periodUnit: r.periodUnit,
             sort: ri + 1,
           })
-          return normalized
         }),
       })),
     }
@@ -516,29 +515,30 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                           />
                         </div>
 
-                        <div className="field">
+                        <div className="field" style={{display: 'block'}}>
                           <div className="label">Period</div>
-                          <input
-                            className="input"
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={r.periodValue ?? ''}
-                            onChange={e => {
-                              const v = e.target.value
-                              if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
-                            }}/>
-                        </div>
 
-                        <div className="field">
-                          <div className="label">Period unit</div>
-                          <select
-                            className="select"
-                            value={r.periodUnit}
-                            onChange={e => updateRule(g._id, r._id, {periodUnit: e.target.value})}
-                          >
-                            {ENUMS.periodUnits.map(x => <option key={x} value={x}>{x}</option>)}
-                          </select>
+                          <div className="periodRow">
+                            <input
+                              className="input"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={r.periodValue ?? ''}
+                              onChange={e => {
+                                const v = e.target.value
+                                if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
+                              }}
+                            />
+
+                            <select
+                              className="select"
+                              value={r.periodUnit}
+                              onChange={e => updateRule(g._id, r._id, {periodUnit: e.target.value})}
+                            >
+                              {ENUMS.periodUnits.map(x => <option key={x} value={x}>{x}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
