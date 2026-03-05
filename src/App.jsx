@@ -13,6 +13,7 @@ import AuthPage from './components/AuthPage.jsx'
 import SegmentsPage from './components/SegmentsPage.jsx'
 import {ToastContainer} from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
+import {normalizeRuleByBusinessRules} from './lib/validation.js'
 
 function RequireAuth({children}) {
   const token = getAccessToken()
@@ -77,8 +78,8 @@ function TagsPage() {
             _id: uid(),
             connector: 'and',
             event: 'deposit',
+            metric: null,
             aggregation: 'some',
-            metric: 'amount',
             operator: 'gte',
             valueFrom: '',
             valueTo: null,
@@ -103,19 +104,33 @@ function TagsPage() {
         _id: uid(),
         connector: g.connector ?? 'and',
         sort: g.sort ?? gi + 1,
-        rules: (g.rules ?? []).map((r, ri) => ({
-          _id: uid(),
-          connector: r.connector ?? 'and',
-          event: r.event ?? 'deposit',
-          aggregation: r.aggregation ?? 'some',
-          metric: r.metric ?? null,
-          operator: r.operator ?? 'gte',
-          valueFrom: r.valueFrom ?? r.value_from ?? '',
-          valueTo: r.valueTo ?? r.value_to ?? null,
-          periodValue: String(Number(r.periodValue ?? r.period_value ?? 1)),
-          periodUnit: r.periodUnit ?? r.period_unit ?? 'day',
-          sort: r.sort ?? ri + 1,
-        })),
+        rules: (g.rules ?? []).map((r, ri) => {
+          const raw = {
+            _id: uid(),
+            connector: r.connector ?? 'and',
+            event: r.event ?? 'deposit',
+            aggregation: r.aggregation ?? 'some',
+            metric: r.metric ?? null,
+            operator: r.operator ?? 'gte',
+            valueFrom: r.valueFrom ?? r.value_from ?? '',
+            valueTo: r.valueTo ?? r.value_to ?? null,
+            periodValue: Number(r.periodValue ?? r.period_value ?? 240),
+            periodUnit: r.periodUnit ?? r.period_unit ?? 'day',
+            sort: r.sort ?? ri + 1,
+          }
+
+          const norm = normalizeRuleByBusinessRules(raw)
+
+          return {
+            ...raw,
+            aggregation: norm.aggregation,
+            metric: norm.metric,
+            operator: norm.operator,
+            valueTo: norm.valueTo,
+            valueFrom: norm.valueFrom,
+            periodValue: String(norm.periodValue),
+          }
+        }),
       })),
     }
     if (!normalized.groups.length) normalized.groups = initialCreateState.groups

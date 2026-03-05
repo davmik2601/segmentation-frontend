@@ -73,8 +73,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             _id: uid(),
             connector: 'and',
             event: 'deposit',
+            metric: null,
             aggregation: 'some',
-            metric: 'amount',
             operator: 'gte',
             valueFrom: '',
             valueTo: null,
@@ -113,8 +113,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
           _id: uid(),
           connector: 'or',
           event: 'deposit',
+          metric: null,
           aggregation: 'some',
-          metric: 'amount',
           operator: 'gte',
           valueFrom: '',
           valueTo: null,
@@ -167,8 +167,8 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
           const normalized = normalizeRuleByBusinessRules({
             connector: gi === 0 && ri === 0 ? 'and' : (r.connector || 'and'),
             event: r.event,
-            aggregation: r.aggregation,
             metric: r.metric ?? null,
+            aggregation: r.aggregation,
             operator: r.operator,
             valueFrom: r.valueFrom ?? '',
             valueTo: r.valueTo ?? null,
@@ -333,12 +333,14 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                   // UI behavior similar to your backend refine rules
                   const isLogin = event === 'login'
                   const isNetResult = event === 'net_result'
-                  const metricDisabled = isLogin || isNetResult || aggregation === 'count'
-                  const aggregationDisabled = isLogin || isNetResult
+                  const isCasino = event === 'casino'
+                  const isSport = event === 'sport'
+                  const isGgr = r.metric === 'ggr'
+                  const metricEnabled = (isCasino || isSport)
                   const forcedAggregation = isLogin ? 'count' : aggregation
 
-                  const aggregationUiValue = isNetResult ? '' : forcedAggregation
-                  const aggregationUiDisabled = isLogin || isNetResult
+                  const aggregationUiValue = (isNetResult || isGgr) ? '' : forcedAggregation
+                  const aggregationUiDisabled = isLogin || isNetResult || isGgr
 
                   const betweenNeedsTo = operator === 'between' || operator === 'not_between'
                   const valueToDisabled = !betweenNeedsTo
@@ -381,20 +383,54 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                             value={event}
                             onChange={e => {
                               const nextEvent = e.target.value
-                              // if login => force aggregation=count, metric=null
+
+                              const nextIsCasinoOrSport = nextEvent === 'casino' || nextEvent === 'sport'
+                              const nextAgg = nextEvent === 'login'
+                                ? 'count'
+                                : (r.aggregation == null || r.aggregation === 'count' ? 'some' : r.aggregation)
+
                               if (nextEvent === 'login') {
                                 updateRule(g._id, r._id, {event: nextEvent, aggregation: 'count', metric: null})
-                              } else {
-                                // if leaving login, restore defaults if missing
-                                updateRule(g._id, r._id, {
-                                  event: nextEvent,
-                                  aggregation: forcedAggregation === 'count' ? 'some' : forcedAggregation,
-                                  metric: 'amount',
-                                })
+                                return
                               }
+
+                              if (nextEvent === 'net_result') {
+                                updateRule(g._id, r._id, {event: nextEvent, aggregation: null, metric: null})
+                                return
+                              }
+
+                              // deposit/withdrawal/other => metric must be null
+                              // casino/sport => metric allowed only when aggregation != count
+                              updateRule(g._id, r._id, {
+                                event: nextEvent,
+                                aggregation: nextAgg,
+                                metric: nextIsCasinoOrSport
+                                  ? (ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet'))
+                                  : null,
+                              })
                             }}
                           >
                             {ENUMS.events.map(x => <option key={x} value={x}>{x}</option>)}
+                          </select>
+                        </div>
+
+
+                        <div className="field">
+                          <div className="label">Metric</div>
+                          <select
+                            className="select"
+                            style={{opacity: metricEnabled ? 1 : 0.3}}
+                            value={metricEnabled ? ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet') : ''}
+                            disabled={!metricEnabled}
+                            onChange={e => updateRule(g._id, r._id, {metric: e.target.value || null})}
+                          >
+                            {!metricEnabled && (
+                              <option value="" disabled>
+                                not allowed
+                              </option>
+                            )}
+
+                            {ENUMS.metrics.map(x => <option key={x} value={x}>{x}</option>)}
                           </select>
                         </div>
 
@@ -402,40 +438,41 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                           <div className="label">Aggregation</div>
                           <select
                             className="select"
+                            style={{opacity: !aggregationUiDisabled ? 1 : aggregationUiValue !== '' ? 0.6 : 0.3}}
                             value={aggregationUiValue}
                             disabled={aggregationUiDisabled}
                             onChange={e => {
                               const nextAgg = e.target.value
-                              // if count => metric=null
+                              const isCasinoOrSport = event === 'casino' || event === 'sport'
+
                               if (nextAgg === 'count') {
-                                updateRule(g._id, r._id, {aggregation: nextAgg, metric: null})
-                              } else {
-                                updateRule(g._id, r._id, {aggregation: nextAgg, metric: r.metric ?? 'amount'})
+                                const isCasinoOrSport = event === 'casino' || event === 'sport'
+                                const fallbackMetric = ENUMS.metrics[0] || 'bet'
+                                updateRule(g._id, r._id, {
+                                  aggregation: nextAgg,
+                                  metric: isCasinoOrSport
+                                    ? (ENUMS.metrics.includes(r.metric) ? r.metric : fallbackMetric)
+                                    : null,
+                                })
+                                return
                               }
+
+                              // metric allowed only for casino/sport, otherwise keep null
+                              updateRule(g._id, r._id, {
+                                aggregation: nextAgg,
+                                metric: isCasinoOrSport
+                                  ? (ENUMS.metrics.includes(r.metric) ? r.metric : (ENUMS.metrics[0] || 'bet'))
+                                  : null,
+                              })
                             }}
                           >
-                            {isNetResult && (
+                            {(isNetResult || isGgr) && (
                               <option value="" disabled>
                                 not allowed
                               </option>
                             )}
 
                             {ENUMS.aggregations.map(x => <option key={x} value={x}>{x}</option>)}
-                          </select>
-                        </div>
-
-                        <div className="field">
-                          <div className="label">Metric</div>
-                          <select
-                            className="select"
-                            value={metricDisabled ? '' : (r.metric ?? 'amount')}
-                            disabled={metricDisabled}
-                            onChange={e => updateRule(g._id, r._id, {metric: e.target.value || null})}
-                          >
-                            <option value="" disabled>
-                              {metricDisabled ? 'not allowed' : 'select'}
-                            </option>
-                            {ENUMS.metrics.map(x => <option key={x} value={x}>{x}</option>)}
                           </select>
                         </div>
 
@@ -513,7 +550,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         })}
       </div>
 
-      <div className="row row--space">
+      <div className="row row--space" style={{justifyContent: 'flex-end'}}>
         <button type="button" className="btn btn--primary" onClick={submit} disabled={submitting}>
           {submitting ? 'Submitting…' : (isEdit ? 'Update' : 'Create')}
         </button>
