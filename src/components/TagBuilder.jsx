@@ -164,7 +164,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
         connector: gi === 0 ? 'and' : (g.connector || 'and'),
         sort: gi + 1,
         rules: (g.rules ?? []).map((r, ri) => {
-          const normalized = normalizeRuleByBusinessRules({
+          return normalizeRuleByBusinessRules({
             connector: gi === 0 && ri === 0 ? 'and' : (r.connector || 'and'),
             event: r.event,
             metric: r.metric ?? null,
@@ -176,7 +176,6 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             periodUnit: r.periodUnit,
             sort: ri + 1,
           })
-          return normalized
         }),
       })),
     }
