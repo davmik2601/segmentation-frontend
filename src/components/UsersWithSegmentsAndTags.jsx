@@ -9,14 +9,14 @@ function fmtDate(v) {
   return new Date(ms).toLocaleString()
 }
 
-function Badge({text, color, muted, description}) {
+function Badge({text, color, muted, description, emoji}) {
   return (
     <span
       className={`chip ${muted ? 'chip--muted' : ''}`}
       style={color ? {background: color} : undefined}
       title={description || text}
     >
-      {text} &nbsp; ⓘ
+      {emoji ? `${emoji} ${text}` : text} &nbsp; ⓘ
     </span>
   )
 }
@@ -397,6 +397,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
                           text={t.name || t.slug}
                           description={`${t.description || ''} (${t.persistent ? 'persistent' : 'non-persistent'})`}
                           color={t.color || undefined}
+                          emoji={t.emoji || ''}
                         />
                       ))
                     ) : (

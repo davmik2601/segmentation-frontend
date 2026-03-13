@@ -5,6 +5,11 @@ function safeString(v) {
   return String(v)
 }
 
+function safeEmoji(v) {
+  if (v == null) return ''
+  return String(v).trim()
+}
+
 export default function TagList({tags, onEdit, onDelete}) {
   const [q, setQ] = useState('')
 
@@ -28,6 +33,7 @@ export default function TagList({tags, onEdit, onDelete}) {
       <div className="list">
         {filtered.map(tag => {
           const color = tag.color || '#e5e7eb'
+          const emoji = safeEmoji(tag.emoji)
           const active = Number(tag.active ?? 0) === 1
           const groupsCount = (tag.groups?.length ?? 0)
           const rulesCount = (tag.groups ?? []).reduce((acc, g) => acc + (g.rules?.length ?? 0), 0)
@@ -36,6 +42,19 @@ export default function TagList({tags, onEdit, onDelete}) {
             <div key={tag.id} className="list__item">
               <div className="list__left">
                 <div className="dot" style={{background: color}}/>
+                <div
+                  style={{
+                    width: 28,
+                    minWidth: 28,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                    lineHeight: 1,
+                  }}
+                >
+                  {emoji || ''}
+                </div>
                 <div className="list__meta">
                   <div className="list__title">
                     {tag.name}

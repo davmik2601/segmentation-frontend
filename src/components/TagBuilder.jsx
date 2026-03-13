@@ -1,4 +1,5 @@
-import React, {useEffect, useMemo, useState} from 'react'
+import React, {useEffect, useMemo, useRef, useState} from 'react'
+import EmojiPicker from 'emoji-picker-react'
 import {toast} from 'react-toastify'
 import {uid} from '../lib/uid.js'
 import {ENUMS} from '../lib/enums.js'
@@ -6,6 +7,27 @@ import {normalizeRuleByBusinessRules, validateTagPayload} from '../lib/validatio
 
 function deepClone(x) {
   return JSON.parse(JSON.stringify(x))
+}
+
+function splitGraphemes(value) {
+  const text = String(value || '')
+
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'})
+    return Array.from(segmenter.segment(text), x => x.segment)
+  }
+
+  return Array.from(text)
+}
+
+function normalizeSingleEmoji(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  const graphemes = splitGraphemes(text).filter(Boolean)
+  const firstEmoji = graphemes.find(x => /\p{Emoji}/u.test(x))
+
+  return firstEmoji || ''
 }
 
 function Switch({value, onChange, disabled}) {
@@ -35,12 +57,30 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
   const [state, setState] = useState(() => deepClone(initialState))
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState([])
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const emojiPickerRef = useRef(null)
 
   // reset when switching tag to edit
   useEffect(() => {
     setState(deepClone(initialState))
     setErrors([])
   }, [initialState])
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!emojiPickerRef.current?.contains(e.target)) {
+        setEmojiPickerOpen(false)
+      }
+    }
+
+    if (emojiPickerOpen) {
+      document.addEventListener('mousedown', onDocClick)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+    }
+  }, [emojiPickerOpen])
 
   const isEdit = mode === 'edit'
 
@@ -58,6 +98,10 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
 
   function setColor(color) {
     setState(s => ({...s, color}))
+  }
+
+  function setEmoji(emoji) {
+    setState(s => ({...s, emoji: normalizeSingleEmoji(emoji)}))
   }
 
   function addGroup() {
@@ -158,6 +202,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
       color: (state.color && String(state.color).trim())
         ? String(state.color).trim().toLowerCase()
         : null,
+      emoji: normalizeSingleEmoji(state.emoji),
       active: Number(state.active ?? 0) ? 1 : 0,
       persistent: Number(state.persistent ?? 0) ? 1 : 0,
       groups: (state.groups ?? []).map((g, gi) => ({
@@ -241,6 +286,52 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             onChange={e => setColor(e.target.value)}
             style={{height: 36, width: 48, padding: 0, border: 'none', background: 'transparent'}}
           />
+        </div>
+
+        <div className="field">
+          <div className="label">Emoji</div>
+
+          <div
+            className="row row--gap"
+            style={{alignItems: 'center', position: 'relative'}}
+            ref={emojiPickerRef}
+          >
+            <input
+              className="input"
+              value={state.emoji ?? ''}
+              onChange={e => setEmoji(e.target.value)}
+              placeholder="---"
+              maxLength={8}
+              style={{width: 64, textAlign: 'center', fontSize: 20, paddingInline: 8}}
+            />
+
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setEmojiPickerOpen(v => !v)}
+              aria-label="Open emoji picker"
+              title="Open emoji picker"
+              style={{minWidth: 42, paddingInline: 10}}
+            >
+              {'😊'}
+            </button>
+
+            {emojiPickerOpen && (
+              <div style={{position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 30}}>
+                <EmojiPicker
+                  onEmojiClick={emojiData => {
+                    setEmoji(emojiData.emoji)
+                    setEmojiPickerOpen(false)
+                  }}
+                  searchDisabled={false}
+                  skinTonesDisabled={false}
+                  previewConfig={{showPreview: false}}
+                  width={320}
+                  height={400}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="field">

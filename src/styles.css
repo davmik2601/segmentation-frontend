@@ -18,6 +18,7 @@
 html, body {
     height: 100%;
 }
+
 html {
     overflow-y: scroll;
 }
@@ -428,7 +429,7 @@ select option {
 .list__left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
     min-width: 0;
 }
 
@@ -625,7 +626,10 @@ select option {
 
 /*// Header*/
 
-.topbar { display: block; }
+.topbar {
+    display: block;
+}
+
 .topbar__actions {
     display: grid;
     grid-template-columns: max-content 1fr max-content;
@@ -658,7 +662,7 @@ select option {
 
 .nav__btn {
     border: 1px solid var(--line);
-    background: rgba(255,255,255,0.03);
+    background: rgba(255, 255, 255, 0.03);
     color: var(--muted);
     padding: 10px 12px;
     border-radius: 10px;
@@ -667,13 +671,13 @@ select option {
 }
 
 .nav__btn:hover {
-    background: rgba(255,255,255,0.07);
+    background: rgba(255, 255, 255, 0.07);
     color: var(--text);
 }
 
 .nav__btn.is-active {
-    background: rgba(122,167,255,0.18);
-    border-color: rgba(122,167,255,0.35);
+    background: rgba(122, 167, 255, 0.18);
+    border-color: rgba(122, 167, 255, 0.35);
     color: var(--text);
 }
 
@@ -690,7 +694,6 @@ select option {
         grid-template-columns: 1fr;
     }
 }
-
 
 
 /*   MODAL */
@@ -740,7 +743,7 @@ select option {
     --rdp-accent-background-color: #2563eb;
 
     --rdp-range_middle-background-color: #dbeafe; /* middle days bg */
-    --rdp-range_middle-color: #111;              /* middle days text */
+    --rdp-range_middle-color: #111; /* middle days text */
 
     --rdp-range_start-background: #2563eb;
     --rdp-range_start-color: #fff;
@@ -761,8 +764,8 @@ select option {
 .traceBlock {
     padding: 12px;
     border-radius: 16px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .traceBlock__title {
@@ -794,8 +797,8 @@ select option {
     position: relative;
     display: block;
     flex: 0 0 auto;
-    width: 140px;        /* gap between cards */
-    margin: 0 -18px;    /* overlap into both neighbor cards */
+    width: 140px; /* gap between cards */
+    margin: 0 -18px; /* overlap into both neighbor cards */
 }
 
 
@@ -804,11 +807,11 @@ select option {
     content: '';
     position: absolute;
     top: 50%;
-    left: -9px;      /* extend into previous card */
-    right: -9px;     /* extend into next card */
+    left: -9px; /* extend into previous card */
+    right: -9px; /* extend into next card */
     transform: translateY(-50%);
     height: 2px;
-    background: rgba(255,255,255,0.14);
+    background: rgba(255, 255, 255, 0.14);
     border-radius: 999px;
     z-index: 1;
 }
@@ -821,7 +824,7 @@ select option {
     top: 50%;
     transform: translateY(-50%);
     height: 2px;
-    background: rgba(255,255,255,0.14);
+    background: rgba(255, 255, 255, 0.14);
     border-radius: 999px;
 }
 
@@ -836,7 +839,7 @@ select option {
     padding: 6px 10px;
     border-radius: 999px;
     background: rgba(20, 20, 20, 0.55);
-    border: 1px solid rgba(255,255,255,0.14);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     backdrop-filter: blur(6px);
 }
 
@@ -851,15 +854,15 @@ select option {
 /* disabled boundary pill */
 .traceBetween__input:has(.input:disabled) {
     opacity: 0.7;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 /* disabled input */
 .traceBetween__input .input:disabled {
     background: transparent;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255, 255, 255, 0.5);
     cursor: default;
 }
 
@@ -888,13 +891,13 @@ select option {
     display: flex;
     flex-direction: column;
     gap: 9px;
-    align-items: center;   /* center cards and pills together */
+    align-items: center; /* center cards and pills together */
 }
 
 .traceVBetween {
     position: relative;
-    height: 52px;      /* space between cards vertically */
-    margin: -18px 0;   /* overlap into both cards */
+    height: 52px; /* space between cards vertically */
+    margin: -18px 0; /* overlap into both cards */
     z-index: 3;
 }
 
@@ -905,13 +908,13 @@ select option {
     left: 50%;
     transform: translateX(-50%);
 
-    top: -9px;       /* extend into the card above */
-    bottom: -9px;    /* extend into the card below */
+    top: -9px; /* extend into the card above */
+    bottom: -9px; /* extend into the card below */
 
     width: 2px;
-    background: rgba(255,255,255,0.3);
+    background: rgba(255, 255, 255, 0.3);
     border-radius: 999px;
-    z-index: 1;       /* above cards, below pill */
+    z-index: 1; /* above cards, below pill */
 }
 
 /* centered pill for vertical between */
@@ -925,7 +928,7 @@ select option {
     padding: 6px 10px;
     border-radius: 999px;
     background: rgba(20, 20, 20, 0.55);
-    border: 1px solid rgba(255,255,255,0.14);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     backdrop-filter: blur(6px);
 }
 
@@ -941,18 +944,18 @@ select option {
 .traceVBetween__input:has(.input:disabled) {
     /*opacity: 0.85;*/
     background: rgba(18, 22, 34, 0.3); /* solid-ish, covers the line */
-    border: 1px solid rgba(255,255,255,0.10);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow: none;
 }
 
 /* disabled input stays clean */
 .traceVBetween__input .input:disabled {
     background: transparent;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255, 255, 255, 0.6);
     cursor: not-allowed;
 }
 
 .traceBlock__content {
-    max-width: 520px;     /* or 320..420, choose */
-    margin: 0 auto;       /* center inside block */
+    max-width: 520px; /* or 320..420, choose */
+    margin: 0 auto; /* center inside block */
 }
