@@ -196,13 +196,15 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
   }
 
   const previewPayload = useMemo(() => {
+    const emoji = normalizeSingleEmoji(state.emoji)
+
     // build payload exactly for backend (no _id)
     const payload = {
       name: state.name ?? '',
       color: (state.color && String(state.color).trim())
         ? String(state.color).trim().toLowerCase()
         : null,
-      emoji: normalizeSingleEmoji(state.emoji),
+      ...(emoji ? {emoji} : {}),
       active: Number(state.active ?? 0) ? 1 : 0,
       persistent: Number(state.persistent ?? 0) ? 1 : 0,
       groups: (state.groups ?? []).map((g, gi) => ({
