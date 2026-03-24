@@ -60,6 +60,7 @@ export default function DateTimeRangePicker({
                                               months = 2,
                                               nullToMeansNow = true,
                                               showToNowToggle = true,
+                                              allowFuture = false,
                                             }) {
   const ref = useRef(null)
   const fromTimeRef = useRef(null)
@@ -132,8 +133,8 @@ export default function DateTimeRangePicker({
             classNames={{
               months: 'rdp-months--inline',
             }}
-            disabled={{after: todayDateOnly}}
-            toDate={todayDateOnly}
+            disabled={allowFuture ? undefined : {after: todayDateOnly}}
+            endMonth={allowFuture ? undefined : todayDateOnly}
             selected={selected}
             onSelect={range => {
               const fromD = range?.from ? toDateOnly(range.from.getTime()) : null

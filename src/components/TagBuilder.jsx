@@ -710,6 +710,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                               months={2}
                               nullToMeansNow={false}
                               showToNowToggle={false}
+                              allowFuture={true}
                             />
 
                             <div className="mutedSmall" style={{marginTop: 6}}>
