@@ -188,8 +188,6 @@ export default function SegmentsPage() {
   function SegmentCard({seg}) {
     if (!seg) return null
 
-    console.log(['new_user', 'no_deposit', 'deposit_only'].includes(seg.slug))
-
     return (
       <div
         className="traceCard"

@@ -21,7 +21,7 @@ export function normalizeRuleByBusinessRules(rule) {
   }
 
   // 2) metric rules:
-  // - metric is only allowed for casino/sport (and only when aggregation != count)
+  // - metric is only allowed for casino/sport
   if (!metricAllowed) {
     out.metric = null
   } else {
@@ -44,15 +44,26 @@ export function normalizeRuleByBusinessRules(rule) {
   // ensure types
   out.valueFrom = String(out.valueFrom ?? '')
   out.valueTo = out.valueTo == null ? null : String(out.valueTo)
-  out.periodValue = Number(out.periodValue ?? 240)
+
+  out.timeMode = ENUMS.tagTimeModes.includes(out.timeMode) ? out.timeMode : 'last_period'
+
+  if (out.timeMode === 'last_period') {
+    out.periodValue = Number(out.periodValue ?? 240)
+    out.periodUnit = ENUMS.periodUnits.includes(out.periodUnit) ? out.periodUnit : 'day'
+    out.fromDate = null
+    out.toDate = null
+  } else {
+    out.periodValue = null
+    out.periodUnit = null
+    out.fromDate = out.fromDate == null ? null : Number(out.fromDate)
+    out.toDate = out.toDate == null ? null : Number(out.toDate)
+  }
 
   return out
 }
 
 export function validateTagPayload(payload) {
   const errors = []
-
-  console.log(payload);
 
   if (!payload || typeof payload !== 'object') errors.push('payload must be an object')
   if (!payload.name || !String(payload.name).trim()) errors.push('name is required')
@@ -87,14 +98,37 @@ export function validateTagPayload(payload) {
       }
 
       if (!ENUMS.operators.includes(r.operator)) errors.push(`rule[${gi}][${ri}].operator invalid`)
-      if (!ENUMS.periodUnits.includes(r.periodUnit)) errors.push(`rule[${gi}][${ri}].periodUnit invalid`)
+
+      if (!ENUMS.tagTimeModes.includes(r.timeMode)) {
+        errors.push(`rule[${gi}][${ri}].timeMode invalid`)
+      }
 
       if (!String(r.valueFrom ?? '').length) errors.push(`rule[${gi}][${ri}].valueFrom is required`)
 
       const between = r.operator === 'between' || r.operator === 'not_between'
       if (between && !String(r.valueTo ?? '').length) errors.push(`rule[${gi}][${ri}].valueTo is required for between/not_between`)
 
-      if (!Number.isInteger(r.periodValue) || r.periodValue < 0) errors.push(`rule[${gi}][${ri}].periodValue must be int >= 0`)
+      if (r.timeMode === 'last_period') {
+        if (!ENUMS.periodUnits.includes(r.periodUnit)) errors.push(`rule[${gi}][${ri}].periodUnit invalid`)
+        if (!Number.isInteger(r.periodValue) || r.periodValue < 0) errors.push(`rule[${gi}][${ri}].periodValue must be int >= 0`)
+      }
+
+      if (r.timeMode === 'date_interval') {
+        if (r.periodValue != null) errors.push(`rule[${gi}][${ri}].periodValue must be null when timeMode=date_interval`)
+        if (r.periodUnit != null) errors.push(`rule[${gi}][${ri}].periodUnit must be null when timeMode=date_interval`)
+
+        if (r.fromDate != null && !Number.isInteger(Number(r.fromDate))) {
+          errors.push(`rule[${gi}][${ri}].fromDate must be unix seconds`)
+        }
+
+        if (r.toDate != null && !Number.isInteger(Number(r.toDate))) {
+          errors.push(`rule[${gi}][${ri}].toDate must be unix seconds`)
+        }
+
+        if (r.fromDate == null && r.toDate == null) {
+          errors.push(`rule[${gi}][${ri}].fromDate or toDate is required when timeMode=date_interval`)
+        }
+      }
 
       // metric rules:
       const metricAllowed = r.event === 'casino' || r.event === 'sport'

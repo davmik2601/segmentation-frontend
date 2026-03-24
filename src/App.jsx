@@ -84,8 +84,11 @@ function TagsPage() {
             operator: 'gte',
             valueFrom: '',
             valueTo: null,
+            timeMode: 'last_period',
             periodValue: 240,
             periodUnit: 'day',
+            fromDate: null,
+            toDate: null,
             sort: 1,
           },
         ],
@@ -116,8 +119,15 @@ function TagsPage() {
             operator: r.operator ?? 'gte',
             valueFrom: r.valueFrom ?? r.value_from ?? '',
             valueTo: r.valueTo ?? r.value_to ?? null,
-            periodValue: Number(r.periodValue ?? r.period_value ?? 240),
+            timeMode: r.timeMode ?? r.time_mode ?? 'last_period',
+            periodValue: r.periodValue ?? r.period_value ?? 240,
             periodUnit: r.periodUnit ?? r.period_unit ?? 'day',
+            fromDate: r.fromDate != null
+              ? Number(r.fromDate) * 1000
+              : (r.from_date != null ? Number(r.from_date) * 1000 : null),
+            toDate: r.toDate != null
+              ? Number(r.toDate) * 1000
+              : (r.to_date != null ? Number(r.to_date) * 1000 : null),
             sort: r.sort ?? ri + 1,
           }
 
@@ -130,7 +140,11 @@ function TagsPage() {
             operator: norm.operator,
             valueTo: norm.valueTo,
             valueFrom: norm.valueFrom,
-            periodValue: String(norm.periodValue),
+            timeMode: norm.timeMode,
+            periodValue: norm.periodValue == null ? '' : String(norm.periodValue),
+            periodUnit: norm.periodUnit,
+            fromDate: norm.fromDate,
+            toDate: norm.toDate,
           }
         }),
       })),

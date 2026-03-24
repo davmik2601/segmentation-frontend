@@ -4,6 +4,7 @@ import {toast} from 'react-toastify'
 import {uid} from '../lib/uid.js'
 import {ENUMS} from '../lib/enums.js'
 import {normalizeRuleByBusinessRules, validateTagPayload} from '../lib/validation.js'
+import DateTimeRangePicker from './DateTimeRangePicker.jsx'
 
 function deepClone(x) {
   return JSON.parse(JSON.stringify(x))
@@ -28,6 +29,15 @@ function normalizeSingleEmoji(value) {
   const firstEmoji = graphemes.find(x => /\p{Emoji}/u.test(x))
 
   return firstEmoji || ''
+}
+
+function startOfTodayMs() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime()
+}
+
+function msToUnixSeconds(ms) {
+  return ms == null ? null : Math.floor(Number(ms) / 1000)
 }
 
 function Switch({value, onChange, disabled}) {
@@ -122,8 +132,11 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             operator: 'gte',
             valueFrom: '',
             valueTo: null,
+            timeMode: 'last_period',
             periodValue: 240,
             periodUnit: 'day',
+            fromDate: null,
+            toDate: null,
             sort: 1,
           },
         ],
@@ -162,8 +175,11 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
           operator: 'gte',
           valueFrom: '',
           valueTo: null,
+          timeMode: 'last_period',
           periodValue: 240,
           periodUnit: 'day',
+          fromDate: null,
+          toDate: null,
           sort: ri + 1,
         })
         return {...g, rules}
@@ -219,8 +235,16 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
             operator: r.operator,
             valueFrom: r.valueFrom ?? '',
             valueTo: r.valueTo ?? null,
-            periodValue: r.periodValue === '' || r.periodValue == null ? 240 : Number(r.periodValue),
-            periodUnit: r.periodUnit,
+            timeMode: r.timeMode || 'last_period',
+            ...(String(r.timeMode || 'last_period') === 'last_period'
+              ? {
+                periodValue: r.periodValue === '' || r.periodValue == null ? 240 : Number(r.periodValue),
+                periodUnit: r.periodUnit,
+              }
+              : {
+                fromDate: msToUnixSeconds(r.fromDate),
+                toDate: msToUnixSeconds(r.toDate),
+              }),
             sort: ri + 1,
           })
         }),
@@ -421,6 +445,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                   const event = r.event
                   const aggregation = r.aggregation
                   const operator = r.operator
+                  const timeMode = r.timeMode || 'last_period'
 
                   // UI behavior similar to your backend refine rules
                   const isLogin = event === 'login'
@@ -587,52 +612,111 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                           </select>
                         </div>
 
-                        <div className="field">
-                          <div className="label">Value from</div>
-                          <input
-                            className="input"
-                            value={r.valueFrom ?? ''}
-                            onChange={e => updateRule(g._id, r._id, {valueFrom: e.target.value})}
-                            placeholder="string number (e.g. 13000)"
-                          />
-                        </div>
-
-                        <div className="field">
-                          <div className="label">Value to</div>
-                          <input
-                            className="input"
-                            value={r.valueTo ?? ''}
-                            disabled={valueToDisabled}
-                            onChange={e => updateRule(g._id, r._id, {valueTo: e.target.value || null})}
-                            placeholder={betweenNeedsTo ? 'required for between' : 'n/a'}
-                          />
-                        </div>
-
-                        <div className="field" style={{display: 'block'}}>
-                          <div className="label">Period</div>
+                        <div className="field valuesBreak" style={{display: 'block'}}>
+                          <div className="label">Values</div>
 
                           <div className="periodRow">
                             <input
+                              style={{width: '57%'}}
                               className="input"
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={r.periodValue ?? ''}
-                              onChange={e => {
-                                const v = e.target.value
-                                if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
-                              }}
+                              placeholder="From"
+                              value={r.valueFrom}
+                              onChange={e => updateRule(g._id, r._id, {valueFrom: e.target.value})}
                             />
 
-                            <select
-                              className="select"
-                              value={r.periodUnit}
-                              onChange={e => updateRule(g._id, r._id, {periodUnit: e.target.value})}
-                            >
-                              {ENUMS.periodUnits.map(x => <option key={x} value={x}>{x}</option>)}
-                            </select>
+                            <input
+                              className="input"
+                              placeholder="To"
+                              value={r.valueTo ?? ''}
+                              disabled={!(operator === 'between' || operator === 'not_between')}
+                              onChange={e => updateRule(g._id, r._id, {valueTo: e.target.value})}
+                            />
                           </div>
                         </div>
+
+                        <div className="field">
+                          <div className="label">Time mode</div>
+                          <select
+                            className="select"
+                            value={timeMode}
+                            onChange={e => {
+                              const nextTimeMode = e.target.value
+
+                              if (nextTimeMode === 'date_interval') {
+                                updateRule(g._id, r._id, {
+                                  timeMode: 'date_interval',
+                                  periodValue: '',
+                                  periodUnit: null,
+                                  fromDate: r.fromDate ?? startOfTodayMs(),
+                                  toDate: r.toDate ?? null,
+                                })
+                                return
+                              }
+
+                              updateRule(g._id, r._id, {
+                                timeMode: 'last_period',
+                                periodValue: r.periodValue === '' || r.periodValue == null ? 240 : r.periodValue,
+                                periodUnit: r.periodUnit || 'day',
+                                fromDate: null,
+                                toDate: null,
+                              })
+                            }}
+                          >
+                            <option value="last_period">last_period</option>
+                            <option value="date_interval">date_interval</option>
+                          </select>
+                        </div>
+
+                        {timeMode === 'last_period' ? (
+                          <div className="field" style={{display: 'block'}}>
+                            <div className="label">Period</div>
+
+                            <div className="periodRow">
+                              <input
+                                className="input"
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={r.periodValue ?? ''}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === '' || /^\d+$/.test(v)) updateRule(g._id, r._id, {periodValue: v})
+                                }}
+                              />
+
+                              <select
+                                className="select"
+                                value={r.periodUnit || 'day'}
+                                onChange={e => updateRule(g._id, r._id, {periodUnit: e.target.value})}
+                              >
+                                {ENUMS.periodUnits.map(x => <option key={x} value={x}>{x}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="field" style={{display: 'block'}}>
+                            <div className="label">Date interval</div>
+
+                            <DateTimeRangePicker
+                              fromMs={r.fromDate}
+                              toMs={r.toDate}
+                              onChange={({fromMs, toMs}) => {
+                                updateRule(g._id, r._id, {
+                                  fromDate: fromMs,
+                                  toDate: toMs,
+                                })
+                              }}
+                              placeholder="Select date interval"
+                              months={2}
+                              nullToMeansNow={false}
+                              showToNowToggle={false}
+                            />
+
+                            <div className="mutedSmall" style={{marginTop: 6}}>
+                              fromDate is required by default here, toDate stays optional
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

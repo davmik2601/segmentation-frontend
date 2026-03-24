@@ -58,6 +58,8 @@ export default function DateTimeRangePicker({
                                               onDone,
                                               placeholder = 'Select range',
                                               months = 2,
+                                              nullToMeansNow = true,
+                                              showToNowToggle = true,
                                             }) {
   const ref = useRef(null)
   const fromTimeRef = useRef(null)
@@ -72,9 +74,9 @@ export default function DateTimeRangePicker({
 
   const selected = useMemo(() => {
     const from = fromMs != null ? toDateOnly(fromMs) : undefined
-    const to = from ? (toMs != null ? toDateOnly(toMs) : todayDateOnly) : undefined
+    const to = toMs != null ? toDateOnly(toMs) : undefined
     return {from, to}
-  }, [fromMs, toMs, todayDateOnly])
+  }, [fromMs, toMs])
 
   // close on outside click
   useEffect(() => {
@@ -90,13 +92,13 @@ export default function DateTimeRangePicker({
   const label =
     fromMs == null && toMs == null
       ? placeholder
-      : `${fmt(fromMs)} → ${toMs == null ? 'now' : fmt(toMs)}`
+      : `${fromMs == null ? '—' : fmt(fromMs)} → ${toMs == null ? (nullToMeansNow ? 'now' : '—') : fmt(toMs)}`
 
   const fromTime = fromMs != null ? msToTimeValue(fromMs) : '00:00'
   const toTime =
     toMs != null
       ? msToTimeValue(toMs)
-      : msToTimeValue(Date.now())
+      : '00:00'
 
   return (
     <div ref={ref} style={{position: 'relative'}}>
@@ -152,7 +154,7 @@ export default function DateTimeRangePicker({
               const nextToMs =
                 toD
                   ? withTime(toD, th, tm)
-                  : toMs
+                  : null
 
               onChange({fromMs: nextFromMs, toMs: nextToMs})
             }}
@@ -194,25 +196,28 @@ export default function DateTimeRangePicker({
                   onChange({fromMs, toMs: withTime(d, h, m)})
                 }}
               />
-              <div className="mutedSmall" style={{marginTop: 6}}>
-                <label style={{display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer'}}>
-                  <input
-                    type="checkbox"
-                    checked={toMs == null}
-                    onChange={e => {
-                      if (e.target.checked) onChange({fromMs, toMs: null})
-                      else {
-                        // if enabling "to", default it to today with current time
-                        if (fromMs == null) return
-                        const now = new Date()
-                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                        onChange({fromMs, toMs: withTime(today, now.getHours(), now.getMinutes())})
-                      }
-                    }}
-                  />
-                  To = now
-                </label>
-              </div>
+              {showToNowToggle && (
+                <div className="mutedSmall" style={{marginTop: 6}}>
+                  <label style={{display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer'}}>
+                    <input
+                      type="checkbox"
+                      checked={toMs == null}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          onChange({fromMs, toMs: null})
+                        } else {
+                          // if enabling "to", default it to today with current time
+                          if (fromMs == null) return
+                          const now = new Date()
+                          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                          onChange({fromMs, toMs: withTime(today, now.getHours(), now.getMinutes())})
+                        }
+                      }}
+                    />
+                    To = now
+                  </label>
+                </div>
+              )}
             </div>
           </div>
 
