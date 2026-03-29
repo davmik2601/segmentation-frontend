@@ -344,7 +344,7 @@ export default function LevelsPage() {
           <div className="field">
             <div className="label">timeRangeDays</div>
             <input
-              className="input"
+              className="input input--light"
               type="number"
               min="0"
               value={timeRangeDays}
@@ -355,7 +355,7 @@ export default function LevelsPage() {
           <div className="field">
             <div className="label">xpPerAmount</div>
             <input
-              className="input"
+              className="input input--light"
               type="number"
               min="0"
               step="any"
