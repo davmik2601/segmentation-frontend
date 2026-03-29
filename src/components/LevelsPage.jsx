@@ -392,12 +392,14 @@ export default function LevelsPage() {
               <div
                 className="levelCard"
                 style={{
-                  background: `
-                      linear-gradient(0deg, ${hexToRgba(level.color || '#e5e7eb', 0.28)}, transparent 60%),
-                      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
-                      var(--card2)
-                  `,
-                  borderColor: hexToRgba(level.color || '#e5e7eb', 0.32),
+                  background: hexToRgba(level.color || '#e5e7eb', 0.16),
+                  borderColor: hexToRgba(level.color || '#e5e7eb', 0.34),
+                  // background: `
+                  //     linear-gradient(0deg, ${hexToRgba(level.color || '#e5e7eb', 0.28)}, transparent 60%),
+                  //     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+                  //     var(--card2)
+                  // `,
+                  // borderColor: hexToRgba(level.color || '#e5e7eb', 0.32),
                 }}
               >
                 <div className="levelCard__header">

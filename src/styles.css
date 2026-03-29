@@ -1048,6 +1048,22 @@ select option {
     border-color: rgb(24, 103, 34);
     color: #000000;
     font-weight: 600;
+    animation: badgeNewBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes badgeNewBlink {
+    0% {
+        background: rgb(29, 255, 0);
+        box-shadow: 0 0 0 rgba(29, 255, 0, 0);
+    }
+    50% {
+        background: rgb(120, 255, 100);
+        box-shadow: 0 0 20px rgba(29, 255, 0, 0.9);
+    }
+    100% {
+        background: rgb(29, 255, 0);
+        box-shadow: 0 0 0 rgba(29, 255, 0, 0);
+    }
 }
 
 @media (max-width: 1200px) {
