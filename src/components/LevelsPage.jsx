@@ -416,6 +416,7 @@ export default function LevelsPage() {
                     <div>
                       <div className="group__title">
                         Level {index + 1}
+                        {level.name?.trim() ? ` (${level.name.trim()})` : ''}
                         {level.id ? (
                           <span className="badge">#{level.id}</span>
                         ) : (
