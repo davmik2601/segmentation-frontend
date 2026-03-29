@@ -118,6 +118,20 @@ export const api = {
       },
     }),
 
+  getLevels: () =>
+    req('/api/levels'),
+
+  setupLevels: ({enabled, timeRangeDays, xpPerAmount, levels}) =>
+    req('/api/levels/setup', {
+      method: 'POST',
+      body: {
+        enabled,
+        timeRangeDays,
+        xpPerAmount,
+        levels,
+      },
+    }),
+
   getSegmentStatistics: ({from, to, interval}) =>
     req('/api/statistics/segments', {
       body: {

@@ -39,6 +39,13 @@ export default function AppHeader() {
           </button>
 
           <button
+            className={`nav__btn ${isActive('/levels') ? 'is-active' : ''}`}
+            onClick={() => nav('/levels')}
+          >
+            Levels
+          </button>
+
+          <button
             className={`nav__btn ${isActive('/users') ? 'is-active' : ''}`}
             onClick={() => nav('/users')}
           >

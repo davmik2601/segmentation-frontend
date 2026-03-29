@@ -165,3 +165,106 @@ export function validateTagPayload(payload) {
 
   return {ok: errors.length === 0, errors}
 }
+
+export function validateLevelsSetupPayload(payload) {
+  const errors = []
+
+  if (!payload || typeof payload !== 'object') {
+    errors.push('payload must be an object')
+    return {ok: false, errors}
+  }
+
+  if (typeof payload.enabled !== 'boolean') {
+    errors.push('enabled must be boolean')
+  }
+
+  if (!Number.isInteger(payload.timeRangeDays) || payload.timeRangeDays < 0) {
+    errors.push('timeRangeDays must be int >= 0')
+  }
+
+  if (!(Number(payload.xpPerAmount) > 0)) {
+    errors.push('xpPerAmount must be > 0')
+  }
+
+  if (!Array.isArray(payload.levels)) {
+    errors.push('levels must be an array')
+    return {ok: errors.length === 0, errors}
+  }
+
+  if (payload.enabled && payload.levels.length === 0) {
+    errors.push('At least one level is required when leveling is enabled.')
+  }
+
+  if (payload.levels.length > 0) {
+    const first = payload.levels[0]
+
+    if (first.fromXP == null) {
+      first.fromXP = 0
+    }
+  }
+
+  payload.levels.forEach((level, index) => {
+    const fromXP = level.fromXP
+    const toXP = level.toXP
+    const isFirst = index === 0
+    const isLast = index === payload.levels.length - 1
+    const isMiddle = !isFirst && !isLast
+
+    if (level.id != null) {
+      if (!Number.isInteger(level.id) || level.id <= 0) {
+        errors.push(`levels[${index}].id must be positive int`)
+      }
+    }
+
+    if (!String(level.name ?? '').trim()) {
+      errors.push(`levels[${index}].name is required`)
+    }
+
+    if (level.color != null && String(level.color).trim()) {
+      const ok = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(String(level.color).trim())
+      if (!ok) {
+        errors.push(`levels[${index}].color must be a hex like #eeeeee`)
+      }
+    }
+
+    if (fromXP != null && (!Number.isInteger(fromXP) || fromXP < 0)) {
+      errors.push(`levels[${index}].fromXP must be int >= 0`)
+    }
+
+    if (toXP != null && (!Number.isInteger(toXP) || toXP < 0)) {
+      errors.push(`levels[${index}].toXP must be int >= 0`)
+    }
+
+    if (fromXP != null && toXP != null && fromXP >= toXP) {
+      errors.push(`levels[${index}].fromXP must be less than toXP`)
+    }
+
+    if (isFirst) {
+      if (fromXP == null || toXP == null) {
+        errors.push('toXP is required for the first level.')
+      }
+    }
+
+    if (isMiddle) {
+      if (fromXP == null || toXP == null) {
+        errors.push(`levels[${index}].fromXP and toXP are required for middle levels`)
+      }
+    }
+
+    if (isLast) {
+      if (fromXP == null) {
+        errors.push('fromXP is required for the last level.')
+      }
+    }
+
+    if (index > 0) {
+      const prev = payload.levels[index - 1]
+
+      if (prev.toXP != null && fromXP != null && prev.toXP + 1 !== fromXP) {
+        errors.push(`levels[${index}].fromXP must match previous level toXP + 1`)
+      }
+    }
+  })
+
+  return {ok: errors.length === 0, errors}
+}

@@ -3,6 +3,7 @@ import {Routes, Route, Navigate, useNavigate, useSearchParams, useParams} from '
 import AppHeader from './components/AppHeader.jsx'
 import TagBuilder from './components/TagBuilder.jsx'
 import TagList from './components/TagList.jsx'
+import LevelsPage from './components/LevelsPage.jsx'
 import UsersWithSegmentsAndTags from './components/UsersWithSegmentsAndTags.jsx'
 import SegmentStatisticsCharts from './components/SegmentStatisticsCharts.jsx'
 import UserHistoryCharts from './components/UserHistoryCharts.jsx'
@@ -308,6 +309,17 @@ export default function App() {
         />
 
         <Route
+          path="/segments"
+          element={
+            <RequireAuth>
+              <ProtectedLayout>
+                <SegmentsPage/>
+              </ProtectedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
           path="/tags"
           element={
             <RequireAuth>
@@ -319,11 +331,11 @@ export default function App() {
         />
 
         <Route
-          path="/segments"
+          path="/levels"
           element={
             <RequireAuth>
               <ProtectedLayout>
-                <SegmentsPage/>
+                <LevelsPage/>
               </ProtectedLayout>
             </RequireAuth>
           }
