@@ -996,6 +996,19 @@ select option {
     border-radius: 14px;
     padding: 14px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    animation: levelCardEnter 0.5s ease-out;
+    transform-origin: top center;
+}
+
+@keyframes levelCardEnter {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scaleY(0.96);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+    }
 }
 
 .levelCard__header {
