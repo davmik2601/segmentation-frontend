@@ -1,18 +1,9 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react'
 import {DayPicker} from 'react-day-picker'
+import {formatDateTime} from '../lib/date.js'
 
 function fmt(ms) {
-  if (ms == null) return '—'
-  const d = new Date(ms)
-  // 24h format without AM/PM
-  return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return formatDateTime(ms)
 }
 
 function toDateOnly(ms) {

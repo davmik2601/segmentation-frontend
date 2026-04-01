@@ -3,6 +3,7 @@ import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import DateRangePicker from './DateRangePicker.jsx'
 import {api} from '../lib/api.js'
+import {formatDateTime} from '../lib/date.js'
 
 Highcharts.setOptions({
   time: {useUTC: false},
@@ -24,16 +25,7 @@ function fmtRange(fromSec, toSec) {
 
   const format = ms =>
     Number.isFinite(ms)
-      ? new Date(ms).toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZone: 'UTC', // force UTC
-      })
+      ? formatDateTime(ms)
       : ''
 
   const a = format(fromMs)
@@ -326,7 +318,7 @@ export default function SegmentStatisticsCharts({refreshKey}) {
           </div>
 
           <div className="mutedSmall">
-            Applied: {appliedFromMs ? new Date(appliedFromMs).toLocaleString() : '—'} → {appliedToMs ? new Date(appliedToMs).toLocaleString() : 'now'}
+            Applied: {appliedFromMs ? formatDateTime(appliedFromMs) : '—'} → {appliedToMs ? formatDateTime(appliedToMs) : 'now'}
           </div>
         </div>
 

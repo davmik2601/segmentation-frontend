@@ -1,13 +1,14 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react'
 import {api} from '../lib/api.js'
 import DateTimeRangePicker from './DateTimeRangePicker.jsx'
+import {formatDateTime} from '../lib/date.js'
 
 function fmtDate(v) {
   if (!v) return ''
   const n = Number(v)
   if (!Number.isFinite(n)) return String(v)
   const ms = n > 10_000_000_000 ? n : n * 1000
-  return new Date(ms).toLocaleString()
+  return formatDateTime(ms)
 }
 
 function Badge({text, color, muted, description, emoji, bottomText}) {

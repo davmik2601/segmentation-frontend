@@ -4,6 +4,7 @@ import Highcharts from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import 'highcharts/modules/xrange'
 import DateTimeRangePicker from './DateTimeRangePicker.jsx'
+import {formatDateTime} from '../lib/date.js'
 
 Highcharts.setOptions({
   time: {useUTC: false},
@@ -14,7 +15,7 @@ function toUnixSeconds(ms) {
 }
 
 function fmtDateTime(ms) {
-  return new Date(ms).toLocaleString()
+  return formatDateTime(ms)
 }
 
 function actionKind(action) {
@@ -487,7 +488,7 @@ export default function UserHistoryCharts({user, onBack}) {
           </div>
 
           <div className="mutedSmall">
-            Applied: {appliedFromMs ? new Date(appliedFromMs).toLocaleString(undefined, {hour12: false}) : '—'} → {appliedToMs ? new Date(appliedToMs).toLocaleString(undefined, {hour12: false}) : 'now'}
+            Applied: {appliedFromMs ? formatDateTime(appliedFromMs) : '—'} → {appliedToMs ? formatDateTime(appliedToMs) : 'now'}
           </div>
         </div>
       </div>

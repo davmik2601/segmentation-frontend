@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react'
 import {DayPicker} from 'react-day-picker'
+import {formatDateOnly} from '../lib/date.js'
 
 function startOfDayMs(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime()
@@ -10,8 +11,7 @@ function endOfDayMs(d) {
 }
 
 function fmt(ms) {
-  if (ms == null) return '—'
-  return new Date(ms).toLocaleDateString()
+  return formatDateOnly(ms)
 }
 
 export default function DateRangePicker({
