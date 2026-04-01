@@ -372,7 +372,9 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
           </div>
 
           <div className="field" style={{minWidth: 320, flex: '0 0 auto'}}>
-            <div className="label">Assigned period</div>
+            <div className="label">
+              Tag {assignedDuringPeriod ? 'assigned' : 'present at any time'} during period
+            </div>
             <DateTimeRangePicker
               fromMs={assignedFromMs}
               toMs={assignedToMs}
