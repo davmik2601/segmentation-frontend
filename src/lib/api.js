@@ -85,7 +85,17 @@ export const api = {
   deleteTag: (id) =>
     req('/api/tags/delete', {method: 'POST', body: {id}}),
 
-  getUsersWithSegmentsAndTags: ({limit, offset, userId, search, segmentIds, tagIds}) =>
+  getUsersWithSegmentsAndTags: ({
+                                  limit,
+                                  offset,
+                                  userId,
+                                  search,
+                                  segmentIds,
+                                  tagIds,
+                                  from,
+                                  to,
+                                  assignedDuringPeriod,
+                                }) =>
     req('/api/users/segments-and-tags', {
       body: {
         limit,
@@ -94,6 +104,9 @@ export const api = {
         ...(search ? {search} : {}),
         ...(segmentIds ? {segmentIds} : {}), // comma-separated: "0,1,3"
         ...(tagIds ? {tagIds} : {}),         // comma-separated: "0,4,5"
+        ...(from !== undefined && from !== null ? {from} : {}),
+        ...(to !== undefined && to !== null ? {to} : {}),
+        assignedDuringPeriod: assignedDuringPeriod ? 1 : 0,
       },
     }),
 

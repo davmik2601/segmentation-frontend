@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react'
 import {api} from '../lib/api.js'
+import DateTimeRangePicker from './DateTimeRangePicker.jsx'
 
 function fmtDate(v) {
   if (!v) return ''
@@ -9,14 +10,42 @@ function fmtDate(v) {
   return new Date(ms).toLocaleString()
 }
 
-function Badge({text, color, muted, description, emoji}) {
+function Badge({text, color, muted, description, emoji, bottomText}) {
   return (
     <span
       className={`chip ${muted ? 'chip--muted' : ''}`}
-      style={color ? {background: color} : undefined}
+      style={{
+        ...(color ? {background: color} : {}),
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        lineHeight: 1.2,
+        fontSize: '14px',
+        fontWeight: 600,
+        padding: '5px 10px 0 12px',
+      }}
       title={description || text}
     >
-      {emoji ? `${emoji} ${text}` : text} &nbsp; ⓘ
+      <span>{emoji ? `${emoji} ${text}` : text} &nbsp; ⓘ</span>
+      {bottomText ? (
+        <span
+          className="mutedSmall"
+          style={{
+            backgroundColor: 'rgba(230, 230, 230, 0.7)',
+            borderRadius: '6px',
+            padding: '2px 3px 1px',
+            display: 'block',
+            marginTop: 4,
+            fontSize: 13,
+            color: '#000',
+            fontWeight: 900,
+            // WebkitTextStroke: '0.6px #000',
+            // textShadow: '0 0 2px rgba(0,0,0,0.9)',
+          }}
+        >
+          {bottomText}
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -145,6 +174,9 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
   const [filterSearch, setFilterSearch] = useState('')
   const [segmentIds, setSegmentIds] = useState([]) // numbers
   const [tagIds, setTagIds] = useState([]) // numbers
+  const [assignedFromMs, setAssignedFromMs] = useState(null)
+  const [assignedToMs, setAssignedToMs] = useState(null)
+  const [assignedDuringPeriod, setAssignedDuringPeriod] = useState(false)
 
   // data for filter lists
   const [segments, setSegments] = useState([])
@@ -193,6 +225,9 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
         search: filterSearch || undefined,
         segmentIds: segmentIds.length ? segmentIds.join(',') : undefined,
         tagIds: tagIds.length ? tagIds.join(',') : undefined,
+        from: assignedFromMs != null ? Math.floor(assignedFromMs / 1000) : null,
+        to: assignedToMs != null ? Math.floor(assignedToMs / 1000) : null,
+        assignedDuringPeriod: assignedDuringPeriod ? 1 : 0,
       })
       if (signal?.aborted) return
       setUsers(res?.users ?? [])
@@ -259,7 +294,15 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
       clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterSearch, segmentIds.join(','), tagIds.join(',')])
+  }, [
+    page,
+    filterSearch,
+    segmentIds.join(','),
+    tagIds.join(','),
+    assignedFromMs,
+    assignedToMs,
+    assignedDuringPeriod,
+  ])
 
   // external refresh
   useEffect(() => {
@@ -327,6 +370,60 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
             )}
           </div>
 
+          <div className="field" style={{minWidth: 320, flex: '0 0 auto'}}>
+            <div className="label">Assigned period</div>
+            <DateTimeRangePicker
+              fromMs={assignedFromMs}
+              toMs={assignedToMs}
+              onChange={({fromMs, toMs}) => {
+                setAssignedFromMs(fromMs)
+                setAssignedToMs(toMs)
+                resetToFirstPage()
+              }}
+              placeholder="Select assigned period"
+              months={2}
+              nullToMeansNow={false}
+              showToNowToggle={false}
+              allowFuture={true}
+            />
+
+            <div className="mutedSmall" style={{marginTop: 8}}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  fontWeight: 900,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={assignedDuringPeriod}
+                  onChange={e => {
+                    setAssignedDuringPeriod(e.target.checked)
+                    resetToFirstPage()
+                  }}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    cursor: 'pointer',
+                  }}
+                />
+                Assigned During Period:&nbsp; ({assignedDuringPeriod ? 1 : 0})
+              </label>
+            </div>
+
+            {(assignedFromMs != null || assignedToMs != null) && (
+              <div className="mutedSmall" style={{marginTop: 6}}>
+                from: <span className="mono">{assignedFromMs != null ? Math.floor(assignedFromMs / 1000) : 'null'}</span>
+                {' • '}
+                to: <span className="mono">{assignedToMs != null ? Math.floor(assignedToMs / 1000) : 'null'}</span>
+              </div>
+            )}
+          </div>
+
           <div className="field" style={{minWidth: 120, flex: '0 0 auto', marginLeft: 'auto'}}>
             <div className="label">&nbsp;</div>
             <button
@@ -335,6 +432,9 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
                 setFilterSearch('')
                 setSegmentIds([])
                 setTagIds([])
+                setAssignedFromMs(null)
+                setAssignedToMs(null)
+                setAssignedDuringPeriod(false)
                 resetToFirstPage()
               }}
             >
@@ -382,8 +482,8 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
                         description={seg?.description}
                         color={seg?.color || undefined}
                         muted={!seg}
+                        bottomText={seg?.assignedAt ? fmtDate(seg.assignedAt) : (u.segmentedAt ? fmtDate(u.segmentedAt) : '')}
                       />
-                      <span className="mutedSmall">{fmtDate(u.segmentedAt)}</span>
                     </div>
                   </div>
                 </td>
@@ -398,6 +498,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
                           description={`${t.description || ''} (${t.persistent ? 'persistent' : 'non-persistent'})`}
                           color={t.color || undefined}
                           emoji={t.emoji || ''}
+                          bottomText={t.assignedAt ? fmtDate(t.assignedAt) : ''}
                         />
                       ))
                     ) : (
