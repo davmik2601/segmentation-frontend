@@ -145,14 +145,12 @@ export const api = {
       },
     }),
 
-  setupLevelsConfigsAndRules: ({enabled, timeRangeDays, xpPerAmount, segmentRules}) =>
+  setupLevelsConfigsAndRules: ({configs, sectionRules}) =>
     req('/api/levels/configs-and-rules/setup', {
       method: 'POST',
       body: {
-        enabled,
-        timeRangeDays,
-        xpPerAmount,
-        segmentRules,
+        configs,
+        sectionRules,
       },
     }),
 

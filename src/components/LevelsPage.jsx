@@ -4,10 +4,25 @@ import {api} from '../lib/api.js'
 import {uid} from '../lib/uid.js'
 import {validateLevelsSetupPayload} from '../lib/validation.js'
 
+const LEVEL_SECTIONS = ['sport', 'casino', 'virtual-sport', 'live-casino']
+
+const SECTION_LABELS = {
+  sport: 'Sport',
+  casino: 'Casino',
+  'virtual-sport': 'Virtual Sport',
+  'live-casino': 'Live Casino',
+}
+
 function toIntOrNull(v) {
   if (v === '' || v === null || v === undefined) return null
   const n = Number(v)
   return Number.isInteger(n) ? n : null
+}
+
+function toNumberOrNull(v) {
+  if (v === '' || v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 }
 
 function normalizeLevel(level) {
@@ -46,17 +61,6 @@ function getLevelBaseSpan(level) {
   }
 
   return getLevelSpan(level)
-}
-
-function shiftLevel(level, diff) {
-  const fromXP = toIntOrNull(level.fromXP)
-  const toXP = toIntOrNull(level.toXP)
-
-  return {
-    ...level,
-    fromXP: fromXP == null ? '' : String(fromXP + diff),
-    toXP: toXP == null ? '' : String(toXP + diff),
-  }
 }
 
 function hexToRgba(hex, alpha) {
@@ -107,7 +111,177 @@ function recalculateLevels(levels) {
   return next
 }
 
-function BoolSwitch({value, onChange, leftLabel = 'Disabled', rightLabel = 'Enabled'}) {
+function buildEmptyGameRule(parentXpPerAmount = '1') {
+  return {
+    _id: uid(),
+    finalGameId: '',
+    enabled: true,
+    xpPerAmount: String(parentXpPerAmount ?? '1'),
+  }
+}
+
+function normalizeGameRule(gameRule, parentXpPerAmount = '1') {
+  return {
+    _id: uid(),
+    ...(gameRule?.id ? {id: gameRule.id} : {}),
+    finalGameId: gameRule?.finalGameId == null ? '' : String(gameRule.finalGameId),
+    enabled: Boolean(gameRule?.enabled),
+    xpPerAmount: String(
+      gameRule?.xpPerAmount != null ? gameRule.xpPerAmount : parentXpPerAmount,
+    ),
+  }
+}
+
+function buildEmptyProviderRule(parentXpPerAmount = '1') {
+  return {
+    _id: uid(),
+    finalProviderId: '',
+    enabled: true,
+    gamesDefaultEnabled: true,
+    xpPerAmount: String(parentXpPerAmount ?? '1'),
+    gameRules: [],
+  }
+}
+
+function normalizeProviderRule(providerRule, parentXpPerAmount = '1') {
+  const providerXpPerAmount =
+    providerRule?.xpPerAmount != null
+      ? providerRule.xpPerAmount
+      : parentXpPerAmount
+
+  return {
+    _id: uid(),
+    ...(providerRule?.id ? {id: providerRule.id} : {}),
+    finalProviderId:
+      providerRule?.finalProviderId == null ? '' : String(providerRule.finalProviderId),
+    enabled: Boolean(providerRule?.enabled),
+    gamesDefaultEnabled: Boolean(providerRule?.gamesDefaultEnabled),
+    xpPerAmount: String(providerXpPerAmount),
+    gameRules: Array.isArray(providerRule?.gameRules)
+      ? providerRule.gameRules.map(gameRule =>
+        normalizeGameRule(gameRule, providerXpPerAmount),
+      )
+      : [],
+  }
+}
+
+function buildEmptySectionRule(parentXpPerAmount = '1') {
+  return {
+    _id: uid(),
+    enabled: true,
+    providersDefaultEnabled: true,
+    xpPerAmount: String(parentXpPerAmount ?? '1'),
+    providerRules: [],
+  }
+}
+
+function normalizeSectionRule(sectionKey, sectionRule, parentXpPerAmount = '1') {
+  const sectionXpPerAmount =
+    sectionRule?.xpPerAmount != null
+      ? sectionRule.xpPerAmount
+      : parentXpPerAmount
+
+  return {
+    _id: uid(),
+    ...(sectionRule?.id ? {id: sectionRule.id} : {}),
+    enabled: Boolean(sectionRule?.enabled),
+    providersDefaultEnabled: Boolean(sectionRule?.providersDefaultEnabled),
+    xpPerAmount: String(sectionXpPerAmount),
+    providerRules:
+      sectionKey === 'sport'
+        ? []
+        : Array.isArray(sectionRule?.providerRules)
+          ? sectionRule.providerRules.map(providerRule =>
+            normalizeProviderRule(providerRule, sectionXpPerAmount),
+          )
+          : [],
+  }
+}
+
+function normalizeSectionRules(sectionRules, parentXpPerAmount = '1') {
+  return LEVEL_SECTIONS.reduce((acc, sectionKey) => {
+    acc[sectionKey] = normalizeSectionRule(
+      sectionKey,
+      sectionRules?.[sectionKey],
+      parentXpPerAmount,
+    )
+    return acc
+  }, {})
+}
+
+function validateConfigsAndRulesPayload(payload) {
+  const errors = []
+
+  if (toIntOrNull(payload?.configs?.timeRangeDays) == null || Number(payload.configs.timeRangeDays) < 0) {
+    errors.push('Global config: timeRangeDays must be a non-negative integer')
+  }
+
+  if (toNumberOrNull(payload?.configs?.xpPerAmount) == null || Number(payload.configs.xpPerAmount) < 0) {
+    errors.push('Global config: xpPerAmount must be a non-negative number')
+  }
+
+  for (const sectionKey of LEVEL_SECTIONS) {
+    const sectionRule = payload?.sectionRules?.[sectionKey]
+
+    if (!sectionRule) {
+      errors.push(`Rules: ${SECTION_LABELS[sectionKey]} section is missing`)
+      continue
+    }
+
+    if (toNumberOrNull(sectionRule?.xpPerAmount) == null || Number(sectionRule.xpPerAmount) < 0) {
+      errors.push(`${SECTION_LABELS[sectionKey]}: xpPerAmount must be a non-negative number`)
+    }
+
+    if (sectionKey === 'sport') {
+      continue
+    }
+
+    for (let i = 0; i < sectionRule.providerRules.length; i++) {
+      const providerRule = sectionRule.providerRules[i]
+
+      if (toIntOrNull(providerRule?.finalProviderId) == null || Number(providerRule.finalProviderId) <= 0) {
+        errors.push(
+          `${SECTION_LABELS[sectionKey]} provider #${i + 1}: finalProviderId must be a positive integer`,
+        )
+        return {ok: false, errors}
+      }
+
+      if (toNumberOrNull(providerRule?.xpPerAmount) == null || Number(providerRule.xpPerAmount) < 0) {
+        errors.push(
+          `${SECTION_LABELS[sectionKey]} provider #${i + 1}: xpPerAmount must be a non-negative number`,
+        )
+        return {ok: false, errors}
+      }
+
+      for (let j = 0; j < providerRule.gameRules.length; j++) {
+        const gameRule = providerRule.gameRules[j]
+
+        if (toIntOrNull(gameRule?.finalGameId) == null || Number(gameRule.finalGameId) <= 0) {
+          errors.push(
+            `${SECTION_LABELS[sectionKey]} provider #${i + 1} game #${j + 1}: finalGameId must be a positive integer`,
+          )
+          return {ok: false, errors}
+        }
+
+        if (toNumberOrNull(gameRule?.xpPerAmount) == null || Number(gameRule.xpPerAmount) < 0) {
+          errors.push(
+            `${SECTION_LABELS[sectionKey]} provider #${i + 1} game #${j + 1}: xpPerAmount must be a non-negative number`,
+          )
+          return {ok: false, errors}
+        }
+      }
+    }
+  }
+
+  return {ok: errors.length === 0, errors}
+}
+
+function SegmentedBoolSwitch({
+                               value,
+                               onChange,
+                               leftLabel = 'Disabled',
+                               rightLabel = 'Enabled',
+                             }) {
   return (
     <div className="switch" role="group" aria-label="boolean switch">
       <button
@@ -129,6 +303,35 @@ function BoolSwitch({value, onChange, leftLabel = 'Disabled', rightLabel = 'Enab
   )
 }
 
+function ToggleSwitch({
+                        checked,
+                        onChange,
+                        variant = 'primary',
+                        size = 'md',
+                        disabled = false,
+                      }) {
+  return (
+    <label
+      className={[
+        'toggleSwitch',
+        `toggleSwitch--${variant}`,
+        `toggleSwitch--${size}`,
+        disabled ? 'is-disabled' : '',
+      ].join(' ').trim()}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={e => onChange(e.target.checked)}
+      />
+      <span className="toggleSwitch__track">
+        <span className="toggleSwitch__thumb"/>
+      </span>
+    </label>
+  )
+}
+
 export default function LevelsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -139,7 +342,7 @@ export default function LevelsPage() {
   const [enabled, setEnabled] = useState(false)
   const [timeRangeDays, setTimeRangeDays] = useState('180')
   const [xpPerAmount, setXpPerAmount] = useState('1')
-  const [rules, setRules] = useState({})
+  const [sectionRules, setSectionRules] = useState(() => normalizeSectionRules(null, '1'))
   const [levels, setLevels] = useState([])
 
   async function loadLevels() {
@@ -151,11 +354,12 @@ export default function LevelsPage() {
   async function loadConfigsAndRules() {
     const data = await api.getLevelsConfigsAndRules()
     const configs = data?.configs ?? {}
+    const globalXpPerAmount = String(configs?.xpPerAmount ?? 1)
 
     setEnabled(Boolean(configs?.enabled))
     setTimeRangeDays(String(configs?.timeRangeDays ?? 180))
-    setXpPerAmount(String(configs?.xpPerAmount ?? 1))
-    setRules(data?.rules ?? {})
+    setXpPerAmount(globalXpPerAmount)
+    setSectionRules(normalizeSectionRules(data?.sectionRules, globalXpPerAmount))
   }
 
   async function load() {
@@ -265,6 +469,163 @@ export default function LevelsPage() {
     })
   }
 
+  function updateSectionRule(sectionKey, patch) {
+    setSectionRules(prev => ({
+      ...prev,
+      [sectionKey]: {
+        ...prev[sectionKey],
+        ...patch,
+      },
+    }))
+  }
+
+  function addProviderRule(sectionKey) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule || sectionKey === 'sport') {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: [
+            ...currentSectionRule.providerRules,
+            buildEmptyProviderRule(currentSectionRule.xpPerAmount),
+          ],
+        },
+      }
+    })
+  }
+
+  function updateProviderRule(sectionKey, providerRuleId, patch) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: currentSectionRule.providerRules.map(providerRule =>
+            providerRule._id === providerRuleId
+              ? {
+                ...providerRule,
+                ...patch,
+              }
+              : providerRule,
+          ),
+        },
+      }
+    })
+  }
+
+  function removeProviderRule(sectionKey, providerRuleId) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: currentSectionRule.providerRules.filter(
+            providerRule => providerRule._id !== providerRuleId,
+          ),
+        },
+      }
+    })
+  }
+
+  function addGameRule(sectionKey, providerRuleId) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: currentSectionRule.providerRules.map(providerRule =>
+            providerRule._id === providerRuleId
+              ? {
+                ...providerRule,
+                gameRules: [
+                  ...providerRule.gameRules,
+                  buildEmptyGameRule(providerRule.xpPerAmount),
+                ],
+              }
+              : providerRule,
+          ),
+        },
+      }
+    })
+  }
+
+  function updateGameRule(sectionKey, providerRuleId, gameRuleId, patch) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: currentSectionRule.providerRules.map(providerRule =>
+            providerRule._id === providerRuleId
+              ? {
+                ...providerRule,
+                gameRules: providerRule.gameRules.map(gameRule =>
+                  gameRule._id === gameRuleId
+                    ? {
+                      ...gameRule,
+                      ...patch,
+                    }
+                    : gameRule,
+                ),
+              }
+              : providerRule,
+          ),
+        },
+      }
+    })
+  }
+
+  function removeGameRule(sectionKey, providerRuleId, gameRuleId) {
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: currentSectionRule.providerRules.map(providerRule =>
+            providerRule._id === providerRuleId
+              ? {
+                ...providerRule,
+                gameRules: providerRule.gameRules.filter(
+                  gameRule => gameRule._id !== gameRuleId,
+                ),
+              }
+              : providerRule,
+          ),
+        },
+      }
+    })
+  }
+
   const levelsPreviewPayload = useMemo(() => {
     return {
       levels: levels.map(level => {
@@ -292,19 +653,56 @@ export default function LevelsPage() {
 
   const configsAndRulesPreviewPayload = useMemo(() => {
     return {
-      enabled: Boolean(enabled),
-      timeRangeDays: Number(timeRangeDays),
-      xpPerAmount: Number(xpPerAmount),
-      rules: rules ?? {},
+      configs: {
+        enabled: enabled ? 1 : 0,
+        timeRangeDays: Number(timeRangeDays),
+        xpPerAmount: Number(xpPerAmount),
+      },
+      sectionRules: LEVEL_SECTIONS.reduce((acc, sectionKey) => {
+        const sectionRule = sectionRules[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+
+        acc[sectionKey] = {
+          enabled: sectionRule.enabled ? 1 : 0,
+          providersDefaultEnabled: sectionRule.providersDefaultEnabled ? 1 : 0,
+          xpPerAmount: Number(sectionRule.xpPerAmount),
+          providerRules:
+            sectionKey === 'sport'
+              ? []
+              : sectionRule.providerRules.map(providerRule => ({
+                finalProviderId: Number(providerRule.finalProviderId),
+                enabled: providerRule.enabled ? 1 : 0,
+                gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
+                xpPerAmount: Number(providerRule.xpPerAmount),
+                gameRules: providerRule.gameRules.map(gameRule => ({
+                  finalGameId: Number(gameRule.finalGameId),
+                  enabled: gameRule.enabled ? 1 : 0,
+                  xpPerAmount: Number(gameRule.xpPerAmount),
+                })),
+              })),
+        }
+
+        return acc
+      }, {}),
     }
-  }, [enabled, timeRangeDays, xpPerAmount, rules])
+  }, [enabled, timeRangeDays, xpPerAmount, sectionRules])
 
   async function save() {
     if (activeTab === 'levels') {
       const validation = validateLevelsSetupPayload({
-        ...configsAndRulesPreviewPayload,
+        ...configsAndRulesPreviewPayload.configs,
         levels: levelsPreviewPayload.levels,
       })
+
+      if (!validation.ok) {
+        const msg = validation.errors[0] || 'Please fix validation errors'
+        setErr(msg)
+        toast.error(msg)
+        return
+      }
+    }
+
+    if (activeTab === 'configs-and-rules') {
+      const validation = validateConfigsAndRulesPayload(configsAndRulesPreviewPayload)
 
       if (!validation.ok) {
         const msg = validation.errors[0] || 'Please fix validation errors'
@@ -369,18 +767,8 @@ export default function LevelsPage() {
         <div
           className="switch"
           role="tablist"
-          aria-label="Levels page tabs"
+          aria-label="levels page tabs"
         >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'levels'}
-            className={`switch__btn ${activeTab === 'levels' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('levels')}
-          >
-            Levels
-          </button>
-
           <button
             type="button"
             role="tab"
@@ -389,6 +777,16 @@ export default function LevelsPage() {
             onClick={() => setActiveTab('configs-and-rules')}
           >
             Configs and Rules
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'levels'}
+            className={`switch__btn ${activeTab === 'levels' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('levels')}
+          >
+            Levels
           </button>
         </div>
       </div>
@@ -404,7 +802,7 @@ export default function LevelsPage() {
             <div className="levelsConfigGrid">
               <div className="field">
                 <div className="label">enabled</div>
-                <BoolSwitch value={enabled} onChange={setEnabled}/>
+                <SegmentedBoolSwitch value={enabled} onChange={setEnabled}/>
               </div>
 
               <div className="field">
@@ -435,6 +833,255 @@ export default function LevelsPage() {
           <div className="card">
             <div className="card__header">
               <div className="card__title">Rules</div>
+              <div className="pill">4 sections</div>
+            </div>
+
+            <div className="rulesSections">
+              {LEVEL_SECTIONS.map(sectionKey => {
+                const sectionRule = sectionRules[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+
+                return (
+                  <div key={sectionKey} className="ruleSectionCard">
+                    <div className="ruleSectionCard__header">
+                      <div>
+                        <div className="group__title">
+                          {SECTION_LABELS[sectionKey]}
+                          {sectionRule.id ? (
+                            <span className="badge">#{sectionRule.id}</span>
+                          ) : null}
+                        </div>
+                        <div className="hint">Section rule</div>
+                      </div>
+                    </div>
+
+                    <div className="ruleSectionCard__grid">
+                      <div className="field">
+                        <div className="label">enabled</div>
+                        <ToggleSwitch
+                          checked={sectionRule.enabled}
+                          onChange={value => updateSectionRule(sectionKey, {enabled: value})}
+                          variant="primary"
+                        />
+                      </div>
+
+                      <div className="field">
+                        <div className="label">xpPerAmount</div>
+                        <input
+                          className="input input--light"
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={sectionRule.xpPerAmount}
+                          onChange={e => updateSectionRule(sectionKey, {xpPerAmount: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="field">
+                        <div className="label">providersDefaultEnabled</div>
+                        <ToggleSwitch
+                          checked={sectionRule.providersDefaultEnabled}
+                          onChange={value => updateSectionRule(sectionKey, {providersDefaultEnabled: value})}
+                          variant="secondary"
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+
+                    {sectionKey === 'sport' ? (
+                      <div className="empty">
+                        Sport section does not use provider rules. providerRules will always be sent as an empty array.
+                      </div>
+                    ) : (
+                      <div className="rulesProvidersWrap">
+                        <div className="row row--space rulesProvidersTop">
+                          <div className="sectionTitle--small">Provider rules</div>
+
+                          <button
+                            type="button"
+                            className="btn btn--ghost levelsInsertBtn"
+                            onClick={() => addProviderRule(sectionKey)}
+                          >
+                            + Add provider rule
+                          </button>
+                        </div>
+
+                        {!sectionRule.providerRules.length && (
+                          <div className="empty">
+                            No provider rules yet.
+                          </div>
+                        )}
+
+                        <div className="rulesProvidersList">
+                          {sectionRule.providerRules.map((providerRule, providerIndex) => (
+                            <div key={providerRule._id} className="providerRuleCard">
+                              <div className="providerRuleCard__header">
+                                <div>
+                                  <div className="group__title">
+                                    Provider rule {providerIndex + 1}
+                                    {providerRule.id ? (
+                                      <span className="badge">#{providerRule.id}</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="hint">Provider and games setup</div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="btn btn--danger btn--small"
+                                  onClick={() => removeProviderRule(sectionKey, providerRule._id)}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+
+                              <div className="providerRuleCard__grid">
+                                <div className="field">
+                                  <div className="label">finalProviderId</div>
+                                  <input
+                                    className="input input--light"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={providerRule.finalProviderId}
+                                    onChange={e => updateProviderRule(sectionKey, providerRule._id, {
+                                      finalProviderId: e.target.value,
+                                    })}
+                                    placeholder="e.g. 15"
+                                  />
+                                </div>
+
+                                <div className="field">
+                                  <div className="label">enabled</div>
+                                  <ToggleSwitch
+                                    checked={providerRule.enabled}
+                                    onChange={value => updateProviderRule(sectionKey, providerRule._id, {
+                                      enabled: value,
+                                    })}
+                                    variant="primary"
+                                  />
+                                </div>
+
+                                <div className="field">
+                                  <div className="label">xpPerAmount</div>
+                                  <input
+                                    className="input input--light"
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={providerRule.xpPerAmount}
+                                    onChange={e => updateProviderRule(sectionKey, providerRule._id, {
+                                      xpPerAmount: e.target.value,
+                                    })}
+                                  />
+                                </div>
+
+                                <div className="field">
+                                  <div className="label">gamesDefaultEnabled</div>
+                                  <ToggleSwitch
+                                    checked={providerRule.gamesDefaultEnabled}
+                                    onChange={value => updateProviderRule(sectionKey, providerRule._id, {
+                                      gamesDefaultEnabled: value,
+                                    })}
+                                    variant="secondary"
+                                    size="sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="rulesGamesWrap">
+                                <div className="row row--space rulesProvidersTop">
+                                  <div className="sectionTitle--small">Game rules</div>
+
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost levelsInsertBtn"
+                                    onClick={() => addGameRule(sectionKey, providerRule._id)}
+                                  >
+                                    + Add game rule
+                                  </button>
+                                </div>
+
+                                {!providerRule.gameRules.length && (
+                                  <div className="empty">
+                                    No game rules yet.
+                                  </div>
+                                )}
+
+                                <div className="rulesGamesList">
+                                  {providerRule.gameRules.map((gameRule, gameIndex) => (
+                                    <div key={gameRule._id} className="gameRuleCard">
+                                      <div className="gameRuleCard__header">
+                                        <div>
+                                          <div className="group__title">
+                                            Game rule {gameIndex + 1}
+                                            {gameRule.id ? (
+                                              <span className="badge">#{gameRule.id}</span>
+                                            ) : null}
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          className="btn btn--danger btn--small"
+                                          onClick={() => removeGameRule(sectionKey, providerRule._id, gameRule._id)}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+
+                                      <div className="gameRuleCard__grid">
+                                        <div className="field">
+                                          <div className="label">finalGameId</div>
+                                          <input
+                                            className="input input--light"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={gameRule.finalGameId}
+                                            onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
+                                              finalGameId: e.target.value,
+                                            })}
+                                            placeholder="e.g. 1025"
+                                          />
+                                        </div>
+
+                                        <div className="field">
+                                          <div className="label">enabled</div>
+                                          <ToggleSwitch
+                                            checked={gameRule.enabled}
+                                            onChange={value => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
+                                              enabled: value,
+                                            })}
+                                            variant="primary"
+                                          />
+                                        </div>
+
+                                        <div className="field">
+                                          <div className="label">xpPerAmount</div>
+                                          <input
+                                            className="input input--light"
+                                            type="number"
+                                            min="0"
+                                            step="any"
+                                            value={gameRule.xpPerAmount}
+                                            onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
+                                              xpPerAmount: e.target.value,
+                                            })}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </>
