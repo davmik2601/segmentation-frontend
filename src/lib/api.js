@@ -134,14 +134,25 @@ export const api = {
   getLevels: () =>
     req('/api/levels'),
 
-  setupLevels: ({enabled, timeRangeDays, xpPerAmount, levels}) =>
+  getLevelsConfigsAndRules: () =>
+    req('/api/levels/configs-and-rules'),
+
+  setupLevels: ({levels}) =>
     req('/api/levels/setup', {
+      method: 'POST',
+      body: {
+        levels,
+      },
+    }),
+
+  setupLevelsConfigsAndRules: ({enabled, timeRangeDays, xpPerAmount, segmentRules}) =>
+    req('/api/levels/configs-and-rules/setup', {
       method: 'POST',
       body: {
         enabled,
         timeRangeDays,
         xpPerAmount,
-        levels,
+        segmentRules,
       },
     }),
 

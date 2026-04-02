@@ -134,24 +134,39 @@ export default function LevelsPage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
+  const [activeTab, setActiveTab] = useState('configs-and-rules')
+
   const [enabled, setEnabled] = useState(false)
   const [timeRangeDays, setTimeRangeDays] = useState('180')
   const [xpPerAmount, setXpPerAmount] = useState('1')
+  const [rules, setRules] = useState({})
   const [levels, setLevels] = useState([])
+
+  async function loadLevels() {
+    const data = await api.getLevels()
+    const list = Array.isArray(data?.levels) ? data.levels : []
+    setLevels(list.map(normalizeLevel))
+  }
+
+  async function loadConfigsAndRules() {
+    const data = await api.getLevelsConfigsAndRules()
+    const configs = data?.configs ?? {}
+
+    setEnabled(Boolean(configs?.enabled))
+    setTimeRangeDays(String(configs?.timeRangeDays ?? 180))
+    setXpPerAmount(String(configs?.xpPerAmount ?? 1))
+    setRules(data?.rules ?? {})
+  }
 
   async function load() {
     setLoading(true)
     setErr(null)
 
     try {
-      const data = await api.getLevels()
-      const configs = data?.configs ?? {}
-      const list = Array.isArray(data?.levels) ? data.levels : []
-
-      setEnabled(Boolean(configs?.enabled))
-      setTimeRangeDays(String(configs?.timeRangeDays ?? 180))
-      setXpPerAmount(String(configs?.xpPerAmount ?? 1))
-      setLevels(list.map(normalizeLevel))
+      await Promise.all([
+        loadLevels(),
+        loadConfigsAndRules(),
+      ])
     } catch (e) {
       setErr(e?.message || String(e))
     } finally {
@@ -250,11 +265,8 @@ export default function LevelsPage() {
     })
   }
 
-  const previewPayload = useMemo(() => {
+  const levelsPreviewPayload = useMemo(() => {
     return {
-      enabled: Boolean(enabled),
-      timeRangeDays: Number(timeRangeDays),
-      xpPerAmount: Number(xpPerAmount),
       levels: levels.map(level => {
         const item = {
           ...(level.id ? {id: level.id} : {}),
@@ -276,29 +288,53 @@ export default function LevelsPage() {
         return item
       }),
     }
-  }, [enabled, timeRangeDays, xpPerAmount, levels])
+  }, [levels])
+
+  const configsAndRulesPreviewPayload = useMemo(() => {
+    return {
+      enabled: Boolean(enabled),
+      timeRangeDays: Number(timeRangeDays),
+      xpPerAmount: Number(xpPerAmount),
+      rules: rules ?? {},
+    }
+  }, [enabled, timeRangeDays, xpPerAmount, rules])
 
   async function save() {
-    const validation = validateLevelsSetupPayload(previewPayload)
+    if (activeTab === 'levels') {
+      const validation = validateLevelsSetupPayload({
+        ...configsAndRulesPreviewPayload,
+        levels: levelsPreviewPayload.levels,
+      })
 
-    if (!validation.ok) {
-      const msg = validation.errors[0] || 'Please fix validation errors'
-      setErr(msg)
-      toast.error(msg)
-      return
+      if (!validation.ok) {
+        const msg = validation.errors[0] || 'Please fix validation errors'
+        setErr(msg)
+        toast.error(msg)
+        return
+      }
     }
 
     setSaving(true)
     setErr(null)
 
     try {
-      await api.setupLevels(previewPayload)
-      await load()
-      toast.success('Levels saved')
+      if (activeTab === 'levels') {
+        await api.setupLevels(levelsPreviewPayload)
+        await loadLevels()
+        toast.success('Levels saved')
+      } else {
+        await api.setupLevelsConfigsAndRules(configsAndRulesPreviewPayload)
+        await loadConfigsAndRules()
+        toast.success('Configs and rules saved')
+      }
     } catch (e) {
       const msg = e?.message || String(e)
       setErr(msg)
-      toast.error(`Failed to save levels: ${msg}`)
+      toast.error(
+        activeTab === 'levels'
+          ? `Failed to save levels: ${msg}`
+          : `Failed to save configs and rules: ${msg}`,
+      )
     } finally {
       setSaving(false)
     }
@@ -309,7 +345,7 @@ export default function LevelsPage() {
       <div className="row row--space">
         <div>
           <div className="sectionTitle">Levels</div>
-          <div className="mutedSmall">Configure leveling and XP ranges</div>
+          <div className="mutedSmall">Configure leveling configs, rules, and levels</div>
         </div>
 
         <div className="row row--gap">
@@ -330,179 +366,219 @@ export default function LevelsPage() {
       )}
 
       <div className="card">
-        <div className="card__header">
-          <div className="card__title">Global config</div>
-          <div className="pill">{loading ? 'Loading…' : `${levels.length} levels`}</div>
-        </div>
-
-        <div className="levelsConfigGrid">
-          <div className="field">
-            <div className="label">enabled</div>
-            <BoolSwitch value={enabled} onChange={setEnabled}/>
-          </div>
-
-          <div className="field">
-            <div className="label">timeRangeDays</div>
-            <input
-              className="input input--light"
-              type="number"
-              min="0"
-              value={timeRangeDays}
-              onChange={e => setTimeRangeDays(e.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <div className="label">xpPerAmount</div>
-            <input
-              className="input input--light"
-              type="number"
-              min="0"
-              step="any"
-              value={xpPerAmount}
-              onChange={e => setXpPerAmount(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card__header">
-          <div className="card__title">Levels setup</div>
-          <div className="hint">fromXP of next level is always previous toXP + 1</div>
-        </div>
-
-        <div className="levelsBuilder">
+        <div
+          className="switch"
+          role="tablist"
+          aria-label="Levels page tabs"
+        >
           <button
             type="button"
-            className="btn btn--ghost levelsInsertBtn"
-            onClick={() => insertLevelAt(0)}
+            role="tab"
+            aria-selected={activeTab === 'levels'}
+            className={`switch__btn ${activeTab === 'levels' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('levels')}
           >
-            + Add level here
+            Levels
           </button>
 
-          {!levels.length && (
-            <div className="empty">
-              No levels yet. Create first level.
-            </div>
-          )}
-
-          {levels.map((level, index) => (
-            <React.Fragment key={level._id}>
-              <div
-                className="levelCard"
-                style={{
-                  background: hexToRgba(level.color || '#e5e7eb', 0.16),
-                  borderColor: hexToRgba(level.color || '#e5e7eb', 0.34),
-                  // background: `
-                  //     linear-gradient(0deg, ${hexToRgba(level.color || '#e5e7eb', 0.28)}, transparent 60%),
-                  //     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
-                  //     var(--card2)
-                  // `,
-                  // borderColor: hexToRgba(level.color || '#e5e7eb', 0.32),
-                }}
-              >
-                <div className="levelCard__header">
-                  <div className="row row--gap">
-                    <div
-                      className="dot"
-                      style={{
-                        background: level.color || '#e5e7eb',
-                        height: 28,
-                        width: 28,
-                      }}
-                    />
-
-                    <div>
-                      <div className="group__title">
-                        Level {index + 1}
-                        {level.name?.trim() ? ` (${level.name.trim()})` : ''}
-                        {level.id ? (
-                          <span className="badge">#{level.id}</span>
-                        ) : (
-                          <span className="badge badge--new">NEW</span>
-                        )}
-                      </div>
-                      <div className="hint">Create all levels, then save once</div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn--danger btn--small"
-                    onClick={() => removeLevel(level._id)}
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="levelsCardGrid">
-                  <div className="field">
-                    <div className="label">name *</div>
-                    <input
-                      className="input"
-                      value={level.name}
-                      onChange={e => updateLevel(level._id, {name: e.target.value})}
-                      placeholder="e.g. Bronze"
-                    />
-                  </div>
-
-                  <div className="field levelsColorField">
-                    <div className="label">color</div>
-                    <input
-                      className="levelsColorPicker"
-                      type="color"
-                      value={level.color || '#e5e7eb'}
-                      onChange={e => updateLevel(level._id, {color: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="field levelsXpField">
-                    <div className="label">XP range</div>
-                    <div className="levelsXpRow">
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        value={level.fromXP}
-                        onChange={e => updateLevel(level._id, {fromXP: e.target.value})}
-                        placeholder="fromXP"
-                      />
-
-                      <input
-                        className="input"
-                        type="number"
-                        min="0"
-                        value={level.toXP}
-                        onChange={e => updateLevel(level._id, {toXP: e.target.value})}
-                        placeholder="toXP"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field levelsDescriptionField">
-                    <div className="label">description</div>
-                    <textarea
-                      className="input levelsTextarea"
-                      value={level.description}
-                      onChange={e => updateLevel(level._id, {description: e.target.value})}
-                      placeholder="Optional description"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn--ghost levelsInsertBtn"
-                onClick={() => insertLevelAt(index + 1)}
-              >
-                + Add level here
-              </button>
-            </React.Fragment>
-          ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'configs-and-rules'}
+            className={`switch__btn ${activeTab === 'configs-and-rules' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('configs-and-rules')}
+          >
+            Configs and Rules
+          </button>
         </div>
       </div>
+
+      {activeTab === 'configs-and-rules' && (
+        <>
+          <div className="card">
+            <div className="card__header">
+              <div className="card__title">Global config</div>
+              <div className="pill">Configs</div>
+            </div>
+
+            <div className="levelsConfigGrid">
+              <div className="field">
+                <div className="label">enabled</div>
+                <BoolSwitch value={enabled} onChange={setEnabled}/>
+              </div>
+
+              <div className="field">
+                <div className="label">timeRangeDays</div>
+                <input
+                  className="input input--light"
+                  type="number"
+                  min="0"
+                  value={timeRangeDays}
+                  onChange={e => setTimeRangeDays(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <div className="label">xpPerAmount</div>
+                <input
+                  className="input input--light"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={xpPerAmount}
+                  onChange={e => setXpPerAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card__header">
+              <div className="card__title">Rules</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'levels' && (
+        <div className="card">
+          <div className="card__header">
+            <div className="card__title">Levels setup</div>
+            <div className="hint">fromXP of next level is always previous toXP + 1</div>
+          </div>
+
+          <div className="levelsBuilder">
+            <button
+              type="button"
+              className="btn btn--ghost levelsInsertBtn"
+              onClick={() => insertLevelAt(0)}
+            >
+              + Add level here
+            </button>
+
+            {!levels.length && (
+              <div className="empty">
+                No levels yet. Create first level.
+              </div>
+            )}
+
+            {levels.map((level, index) => (
+              <React.Fragment key={level._id}>
+                <div
+                  className="levelCard"
+                  style={{
+                    background: hexToRgba(level.color || '#e5e7eb', 0.16),
+                    borderColor: hexToRgba(level.color || '#e5e7eb', 0.34),
+                    // background: `
+                    //     linear-gradient(0deg, ${hexToRgba(level.color || '#e5e7eb', 0.28)}, transparent 60%),
+                    //     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+                    //     var(--card2)
+                    // `,
+                    // borderColor: hexToRgba(level.color || '#e5e7eb', 0.32),
+                  }}
+                >
+                  <div className="levelCard__header">
+                    <div className="row row--gap">
+                      <div
+                        className="dot"
+                        style={{
+                          background: level.color || '#e5e7eb',
+                          height: 28,
+                          width: 28,
+                        }}
+                      />
+
+                      <div>
+                        <div className="group__title">
+                          Level {index + 1}
+                          {level.name?.trim() ? ` (${level.name.trim()})` : ''}
+                          {level.id ? (
+                            <span className="badge">#{level.id}</span>
+                          ) : (
+                            <span className="badge badge--new">NEW</span>
+                          )}
+                        </div>
+                        <div className="hint">Create all levels, then save once</div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn--danger btn--small"
+                      onClick={() => removeLevel(level._id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="levelsCardGrid">
+                    <div className="field">
+                      <div className="label">name *</div>
+                      <input
+                        className="input"
+                        value={level.name}
+                        onChange={e => updateLevel(level._id, {name: e.target.value})}
+                        placeholder="e.g. Bronze"
+                      />
+                    </div>
+
+                    <div className="field levelsColorField">
+                      <div className="label">color</div>
+                      <input
+                        className="levelsColorPicker"
+                        type="color"
+                        value={level.color || '#e5e7eb'}
+                        onChange={e => updateLevel(level._id, {color: e.target.value})}
+                      />
+                    </div>
+
+                    <div className="field levelsXpField">
+                      <div className="label">XP range</div>
+                      <div className="levelsXpRow">
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          value={level.fromXP}
+                          onChange={e => updateLevel(level._id, {fromXP: e.target.value})}
+                          placeholder="fromXP"
+                        />
+
+                        <input
+                          className="input"
+                          type="number"
+                          min="0"
+                          value={level.toXP}
+                          onChange={e => updateLevel(level._id, {toXP: e.target.value})}
+                          placeholder="toXP"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="field levelsDescriptionField">
+                      <div className="label">description</div>
+                      <textarea
+                        className="input levelsTextarea"
+                        value={level.description}
+                        onChange={e => updateLevel(level._id, {description: e.target.value})}
+                        placeholder="Optional description"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn--ghost levelsInsertBtn"
+                  onClick={() => insertLevelAt(index + 1)}
+                >
+                  + Add level here
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
