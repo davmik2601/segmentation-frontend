@@ -337,7 +337,7 @@ export default function LevelsPage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('configs-and-rules')
+  const [activeTab, setActiveTab] = useState('levels')
   const [configSectionKey, setConfigSectionKey] = useState(null)
 
   const [enabled, setEnabled] = useState(false)
@@ -874,21 +874,21 @@ export default function LevelsPage() {
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'configs-and-rules'}
-            className={`switch__btn ${activeTab === 'configs-and-rules' ? 'is-active' : ''}`}
-            onClick={() => setActiveTab('configs-and-rules')}
-          >
-            Configs and Rules
-          </button>
-
-          <button
-            type="button"
-            role="tab"
             aria-selected={activeTab === 'levels'}
             className={`switch__btn ${activeTab === 'levels' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('levels')}
           >
             Levels
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'configs-and-rules'}
+            className={`switch__btn ${activeTab === 'configs-and-rules' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('configs-and-rules')}
+          >
+            Configs and Rules
           </button>
         </div>
       </div>
@@ -947,7 +947,7 @@ export default function LevelsPage() {
                     {renderSectionSettingsBlock(sectionKey, sectionRule, {
                       compact: true,
                       withConfigureButton: true,
-                      withAddProviderButton: true,
+                      withAddProviderButton: false,
                     })}
                   </div>
                 )
