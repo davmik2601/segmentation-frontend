@@ -714,7 +714,7 @@ select option {
 .modalOverlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1204,6 +1204,7 @@ select option {
 }
 
 .levelsSectionModal {
+    padding: 8px 15px;
     width: min(1500px, 96vw);
     max-height: 88vh;
     display: flex;
@@ -1229,6 +1230,7 @@ select option {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
+    margin: 10px 0;
 }
 
 .levelsSectionModal .sectionSettingsCard {
@@ -1496,8 +1498,8 @@ select option {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
-    width: 54px;
-    height: 30px;
+    width: 56px;
+    height: 32px;
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.35);
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1508,8 +1510,8 @@ select option {
     position: absolute;
     top: 3px;
     left: 3px;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: #ffffff;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
@@ -1521,9 +1523,9 @@ select option {
 }
 
 .toggleSwitch--primary input:checked + .toggleSwitch__track {
-    background: rgba(59, 130, 246, 0.95);
-    border-color: rgba(96, 165, 250, 0.95);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    background: rgba(16, 185, 129, 0.9);
+    border-color: rgba(52, 211, 153, 0.9);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
 .toggleSwitch--secondary .toggleSwitch__track {
@@ -1532,25 +1534,25 @@ select option {
 }
 
 .toggleSwitch--secondary input:checked + .toggleSwitch__track {
-    background: rgba(16, 185, 129, 0.9);
-    border-color: rgba(52, 211, 153, 0.9);
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+    background: rgba(59, 130, 246, 0.95);
+    border-color: rgba(96, 165, 250, 0.95);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
 .toggleSwitch--sm .toggleSwitch__track {
-    width: 48px;
-    height: 26px;
+    width: 40px;
+    height: 24px;
 }
 
 .toggleSwitch--sm .toggleSwitch__thumb {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     top: 3px;
     left: 3px;
 }
 
 .toggleSwitch--sm input:checked + .toggleSwitch__track .toggleSwitch__thumb {
-    transform: translateX(22px);
+    transform: translateX(17px);
 }
 
 .toggleSwitch.is-disabled {
