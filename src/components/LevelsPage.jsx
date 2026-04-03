@@ -343,6 +343,12 @@ export default function LevelsPage() {
   const [timeRangeDays, setTimeRangeDays] = useState('180')
   const [xpPerAmount, setXpPerAmount] = useState('1')
   const [sectionRules, setSectionRules] = useState(() => normalizeSectionRules(null, '1'))
+  const [openSections, setOpenSections] = useState(() =>
+    LEVEL_SECTIONS.reduce((acc, key) => {
+      acc[key] = key === 'sport'
+      return acc
+    }, {}),
+  )
   const [levels, setLevels] = useState([])
 
   async function loadLevels() {
@@ -479,7 +485,23 @@ export default function LevelsPage() {
     }))
   }
 
+  function toggleSectionOpen(sectionKey) {
+    setOpenSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }))
+  }
+
+  function openSection(sectionKey) {
+    setOpenSections(prev => ({
+      ...prev,
+      [sectionKey]: true,
+    }))
+  }
+
   function addProviderRule(sectionKey) {
+    openSection(sectionKey)
+
     setSectionRules(prev => {
       const currentSectionRule = prev[sectionKey]
       if (!currentSectionRule || sectionKey === 'sport') {
@@ -543,6 +565,8 @@ export default function LevelsPage() {
   }
 
   function addGameRule(sectionKey, providerRuleId) {
+    openSection(sectionKey)
+
     setSectionRules(prev => {
       const currentSectionRule = prev[sectionKey]
       if (!currentSectionRule) {
@@ -839,23 +863,46 @@ export default function LevelsPage() {
             <div className="rulesSections">
               {LEVEL_SECTIONS.map(sectionKey => {
                 const sectionRule = sectionRules[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+                const isOpen = Boolean(openSections[sectionKey])
 
                 return (
-                  <div key={sectionKey} className="ruleSectionCard">
-                    <div className="ruleSectionCard__header">
-                      <div>
+                  <div
+                    key={sectionKey}
+                    className={`ruleSectionCard ${isOpen ? 'is-open' : 'is-closed'}`}
+                  >
+                    <div
+                      className={`ruleSectionAccordionBar ${isOpen ? 'is-open' : ''}`}
+                      onClick={e => {
+                        if (e.target.closest('.ruleSectionAccordionSafe')) {
+                          return
+                        }
+                        toggleSectionOpen(sectionKey)
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isOpen}
+                      aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${SECTION_LABELS[sectionKey]} section`}
+                      onKeyDown={e => {
+                        if (e.target !== e.currentTarget) {
+                          return
+                        }
+
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          toggleSectionOpen(sectionKey)
+                        }
+                      }}
+                    >
+                      <div className="ruleSectionAccordionBar__section">
                         <div className="group__title">
                           {SECTION_LABELS[sectionKey]}
                           {sectionRule.id ? (
                             <span className="badge">#{sectionRule.id}</span>
                           ) : null}
                         </div>
-                        <div className="hint">Section rule</div>
                       </div>
-                    </div>
 
-                    <div className="ruleSectionCard__grid">
-                      <div className="field">
+                      <div className="field ruleSectionAccordionBar__switchField ruleSectionAccordionSafe">
                         <div className="label">enabled</div>
                         <ToggleSwitch
                           checked={sectionRule.enabled}
@@ -864,7 +911,7 @@ export default function LevelsPage() {
                         />
                       </div>
 
-                      <div className="field">
+                      <div className="field ruleSectionAccordionSafe">
                         <div className="label">xpPerAmount</div>
                         <input
                           className="input input--light"
@@ -876,7 +923,7 @@ export default function LevelsPage() {
                         />
                       </div>
 
-                      <div className="field">
+                      <div className="field ruleSectionAccordionBar__switchField ruleSectionAccordionSafe">
                         <div className="label">providersDefaultEnabled</div>
                         <ToggleSwitch
                           checked={sectionRule.providersDefaultEnabled}
@@ -885,17 +932,10 @@ export default function LevelsPage() {
                           size="sm"
                         />
                       </div>
-                    </div>
 
-                    {sectionKey === 'sport' ? (
-                      <div className="empty">
-                        Sport section does not use provider rules. providerRules will always be sent as an empty array.
-                      </div>
-                    ) : (
-                      <div className="rulesProvidersWrap">
-                        <div className="row row--space rulesProvidersTop">
-                          <div className="sectionTitle--small">Provider rules</div>
-
+                      {sectionKey !== 'sport' ? (
+                        <div className="field ruleSectionAccordionBar__addField ruleSectionAccordionSafe">
+                          <div className="label">&nbsp;</div>
                           <button
                             type="button"
                             className="btn btn--ghost levelsInsertBtn"
@@ -904,181 +944,193 @@ export default function LevelsPage() {
                             + Add provider rule
                           </button>
                         </div>
-
-                        {!sectionRule.providerRules.length && (
-                          <div className="empty">
-                            No provider rules yet.
+                      ) : (
+                        <div className="field ruleSectionAccordionBar__addField">
+                          <div className="label">&nbsp;</div>
+                          <div className="hint ruleSectionSportHint">
+                            No provider rules for sport
                           </div>
-                        )}
+                        </div>
+                      )}
 
-                        <div className="rulesProvidersList">
-                          {sectionRule.providerRules.map((providerRule, providerIndex) => (
-                            <div key={providerRule._id} className="providerRuleCard">
-                              <div className="providerRuleCard__header">
-                                <div>
-                                  <div className="group__title">
-                                    Provider rule {providerIndex + 1}
-                                    {providerRule.id ? (
-                                      <span className="badge">#{providerRule.id}</span>
-                                    ) : null}
-                                  </div>
-                                  <div className="hint">Provider and games setup</div>
-                                </div>
+                      <button
+                        type="button"
+                        className={`ruleSectionAccordionBtn ruleSectionAccordionSafe ${isOpen ? 'is-open' : ''}`}
+                        onClick={() => toggleSectionOpen(sectionKey)}
+                        aria-expanded={isOpen}
+                        aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${SECTION_LABELS[sectionKey]} section`}
+                      >
+                        <span className="ruleSectionAccordionBtn__icon">⌄</span>
+                      </button>
+                    </div>
 
-                                <button
-                                  type="button"
-                                  className="btn btn--danger btn--small"
-                                  onClick={() => removeProviderRule(sectionKey, providerRule._id)}
-                                >
-                                  Remove
-                                </button>
+                    <div className={`ruleSectionAccordionBody ${isOpen ? 'is-open' : ''}`}>
+                      <div className="ruleSectionAccordionBody__inner">
+                        {sectionKey === 'sport' ? (
+                          <div className="empty">
+                            Sport section does not use provider rules. providerRules will always be sent as an empty array.
+                          </div>
+                        ) : (
+                          <div className="rulesProvidersWrap">
+                            {!sectionRule.providerRules.length && (
+                              <div className="empty">
+                                No provider rules yet.
                               </div>
+                            )}
 
-                              <div className="providerRuleCard__grid">
-                                <div className="field">
-                                  <div className="label">finalProviderId</div>
-                                  <input
-                                    className="input input--light"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    value={providerRule.finalProviderId}
-                                    onChange={e => updateProviderRule(sectionKey, providerRule._id, {
-                                      finalProviderId: e.target.value,
-                                    })}
-                                    placeholder="e.g. 15"
-                                  />
-                                </div>
-
-                                <div className="field">
-                                  <div className="label">enabled</div>
-                                  <ToggleSwitch
-                                    checked={providerRule.enabled}
-                                    onChange={value => updateProviderRule(sectionKey, providerRule._id, {
-                                      enabled: value,
-                                    })}
-                                    variant="primary"
-                                  />
-                                </div>
-
-                                <div className="field">
-                                  <div className="label">xpPerAmount</div>
-                                  <input
-                                    className="input input--light"
-                                    type="number"
-                                    min="0"
-                                    step="any"
-                                    value={providerRule.xpPerAmount}
-                                    onChange={e => updateProviderRule(sectionKey, providerRule._id, {
-                                      xpPerAmount: e.target.value,
-                                    })}
-                                  />
-                                </div>
-
-                                <div className="field">
-                                  <div className="label">gamesDefaultEnabled</div>
-                                  <ToggleSwitch
-                                    checked={providerRule.gamesDefaultEnabled}
-                                    onChange={value => updateProviderRule(sectionKey, providerRule._id, {
-                                      gamesDefaultEnabled: value,
-                                    })}
-                                    variant="secondary"
-                                    size="sm"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="rulesGamesWrap">
-                                <div className="row row--space rulesProvidersTop">
-                                  <div className="sectionTitle--small">Game rules</div>
-
-                                  <button
-                                    type="button"
-                                    className="btn btn--ghost levelsInsertBtn"
-                                    onClick={() => addGameRule(sectionKey, providerRule._id)}
-                                  >
-                                    + Add game rule
-                                  </button>
-                                </div>
-
-                                {!providerRule.gameRules.length && (
-                                  <div className="empty">
-                                    No game rules yet.
-                                  </div>
-                                )}
-
-                                <div className="rulesGamesList">
-                                  {providerRule.gameRules.map((gameRule, gameIndex) => (
-                                    <div key={gameRule._id} className="gameRuleCard">
-                                      <div className="gameRuleCard__header">
-                                        <div>
-                                          <div className="group__title">
-                                            Game rule {gameIndex + 1}
-                                            {gameRule.id ? (
-                                              <span className="badge">#{gameRule.id}</span>
-                                            ) : null}
-                                          </div>
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          className="btn btn--danger btn--small"
-                                          onClick={() => removeGameRule(sectionKey, providerRule._id, gameRule._id)}
-                                        >
-                                          Remove
-                                        </button>
-                                      </div>
-
-                                      <div className="gameRuleCard__grid">
-                                        <div className="field">
-                                          <div className="label">finalGameId</div>
-                                          <input
-                                            className="input input--light"
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={gameRule.finalGameId}
-                                            onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
-                                              finalGameId: e.target.value,
-                                            })}
-                                            placeholder="e.g. 1025"
-                                          />
-                                        </div>
-
-                                        <div className="field">
-                                          <div className="label">enabled</div>
-                                          <ToggleSwitch
-                                            checked={gameRule.enabled}
-                                            onChange={value => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
-                                              enabled: value,
-                                            })}
-                                            variant="primary"
-                                          />
-                                        </div>
-
-                                        <div className="field">
-                                          <div className="label">xpPerAmount</div>
-                                          <input
-                                            className="input input--light"
-                                            type="number"
-                                            min="0"
-                                            step="any"
-                                            value={gameRule.xpPerAmount}
-                                            onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
-                                              xpPerAmount: e.target.value,
-                                            })}
-                                          />
-                                        </div>
+                            <div className="rulesProvidersList">
+                              {sectionRule.providerRules.map((providerRule, providerIndex) => (
+                                <div key={providerRule._id} className="providerRuleCard">
+                                  <div className="providerRuleCard__row">
+                                    <div className="providerRuleCard__title">
+                                      <div className="group__title">
+                                        Provider rule {providerIndex + 1}
+                                        {providerRule.id ? (
+                                          <span className="badge">#{providerRule.id}</span>
+                                        ) : null}
                                       </div>
                                     </div>
-                                  ))}
+
+                                    <div className="field providerRuleCard__thumbField">
+                                      <div className="label">provider</div>
+                                      <img
+                                        className="ruleEntityThumb"
+                                        src="https://placehold.co/40x40?text=P"
+                                        alt="Provider"
+                                      />
+                                    </div>
+
+                                    <div className="field">
+                                      <div className="label">enabled</div>
+                                      <ToggleSwitch
+                                        checked={providerRule.enabled}
+                                        onChange={value => updateProviderRule(sectionKey, providerRule._id, {
+                                          enabled: value,
+                                        })}
+                                        variant="primary"
+                                      />
+                                    </div>
+
+                                    <div className="field">
+                                      <div className="label">xpPerAmount</div>
+                                      <input
+                                        className="input input--light"
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={providerRule.xpPerAmount}
+                                        onChange={e => updateProviderRule(sectionKey, providerRule._id, {
+                                          xpPerAmount: e.target.value,
+                                        })}
+                                      />
+                                    </div>
+
+                                    <div className="field">
+                                      <div className="label">gamesDefaultEnabled</div>
+                                      <ToggleSwitch
+                                        checked={providerRule.gamesDefaultEnabled}
+                                        onChange={value => updateProviderRule(sectionKey, providerRule._id, {
+                                          gamesDefaultEnabled: value,
+                                        })}
+                                        variant="secondary"
+                                        size="sm"
+                                      />
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      className="btn btn--danger btn--small providerRuleCard__removeBtn"
+                                      onClick={() => removeProviderRule(sectionKey, providerRule._id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+
+                                  <div className="rulesGamesWrap">
+                                    <div className="row row--space rulesProvidersTop">
+                                      <div className="sectionTitle--small">Game rules</div>
+
+                                      <button
+                                        type="button"
+                                        className="btn btn--ghost levelsInsertBtn"
+                                        onClick={() => addGameRule(sectionKey, providerRule._id)}
+                                      >
+                                        + Add game rule
+                                      </button>
+                                    </div>
+
+                                    {!providerRule.gameRules.length && (
+                                      <div className="empty">
+                                        No game rules yet.
+                                      </div>
+                                    )}
+
+                                    <div className="rulesGamesList">
+                                      {providerRule.gameRules.map((gameRule, gameIndex) => (
+                                        <div key={gameRule._id} className="gameRuleCard">
+                                          <div className="gameRuleCard__row">
+                                            <div className="gameRuleCard__title">
+                                              <div className="group__title">
+                                                Game rule {gameIndex + 1}
+                                                {gameRule.id ? (
+                                                  <span className="badge">#{gameRule.id}</span>
+                                                ) : null}
+                                              </div>
+                                            </div>
+
+                                            <div className="field gameRuleCard__thumbField">
+                                              <div className="label">game</div>
+                                              <img
+                                                className="ruleEntityThumb"
+                                                src="https://placehold.co/40x40?text=G"
+                                                alt="Game"
+                                              />
+                                            </div>
+
+                                            <div className="field">
+                                              <div className="label">enabled</div>
+                                              <ToggleSwitch
+                                                checked={gameRule.enabled}
+                                                onChange={value => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
+                                                  enabled: value,
+                                                })}
+                                                variant="primary"
+                                              />
+                                            </div>
+
+                                            <div className="field">
+                                              <div className="label">xpPerAmount</div>
+                                              <input
+                                                className="input input--light"
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                value={gameRule.xpPerAmount}
+                                                onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
+                                                  xpPerAmount: e.target.value,
+                                                })}
+                                              />
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              className="btn btn--danger btn--small gameRuleCard__removeBtn"
+                                              onClick={() => removeGameRule(sectionKey, providerRule._id, gameRule._id)}
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
