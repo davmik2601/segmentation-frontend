@@ -206,23 +206,33 @@ function normalizeSectionRules(sectionRules, parentXpPerAmount = '1') {
 function validateConfigsAndRulesPayload(payload) {
   const errors = []
 
-  if (toIntOrNull(payload?.configs?.timeRangeDays) == null || Number(payload.configs.timeRangeDays) < 0) {
-    errors.push('Global config: timeRangeDays must be a non-negative integer')
-  }
+  if (payload?.configs) {
+    if (
+      toIntOrNull(payload.configs.timeRangeDays) == null ||
+      Number(payload.configs.timeRangeDays) < 0
+    ) {
+      errors.push('Global config: timeRangeDays must be a non-negative integer')
+    }
 
-  if (toNumberOrNull(payload?.configs?.xpPerAmount) == null || Number(payload.configs.xpPerAmount) < 0) {
-    errors.push('Global config: xpPerAmount must be a non-negative number')
+    if (
+      toNumberOrNull(payload.configs.xpPerAmount) == null ||
+      Number(payload.configs.xpPerAmount) < 0
+    ) {
+      errors.push('Global config: xpPerAmount must be a non-negative number')
+    }
   }
 
   for (const sectionKey of LEVEL_SECTIONS) {
     const sectionRule = payload?.sectionRules?.[sectionKey]
 
     if (!sectionRule) {
-      errors.push(`Rules: ${SECTION_LABELS[sectionKey]} section is missing`)
       continue
     }
 
-    if (toNumberOrNull(sectionRule?.xpPerAmount) == null || Number(sectionRule.xpPerAmount) < 0) {
+    if (
+      toNumberOrNull(sectionRule?.xpPerAmount) == null ||
+      Number(sectionRule.xpPerAmount) < 0
+    ) {
       errors.push(`${SECTION_LABELS[sectionKey]}: xpPerAmount must be a non-negative number`)
     }
 
@@ -233,14 +243,20 @@ function validateConfigsAndRulesPayload(payload) {
     for (let i = 0; i < sectionRule.providerRules.length; i++) {
       const providerRule = sectionRule.providerRules[i]
 
-      if (toIntOrNull(providerRule?.finalProviderId) == null || Number(providerRule.finalProviderId) <= 0) {
+      if (
+        toIntOrNull(providerRule?.finalProviderId) == null ||
+        Number(providerRule.finalProviderId) <= 0
+      ) {
         errors.push(
           `${SECTION_LABELS[sectionKey]} provider #${i + 1}: finalProviderId must be a positive integer`,
         )
         return {ok: false, errors}
       }
 
-      if (toNumberOrNull(providerRule?.xpPerAmount) == null || Number(providerRule.xpPerAmount) < 0) {
+      if (
+        toNumberOrNull(providerRule?.xpPerAmount) == null ||
+        Number(providerRule.xpPerAmount) < 0
+      ) {
         errors.push(
           `${SECTION_LABELS[sectionKey]} provider #${i + 1}: xpPerAmount must be a non-negative number`,
         )
@@ -250,14 +266,20 @@ function validateConfigsAndRulesPayload(payload) {
       for (let j = 0; j < providerRule.gameRules.length; j++) {
         const gameRule = providerRule.gameRules[j]
 
-        if (toIntOrNull(gameRule?.finalGameId) == null || Number(gameRule.finalGameId) <= 0) {
+        if (
+          toIntOrNull(gameRule?.finalGameId) == null ||
+          Number(gameRule.finalGameId) <= 0
+        ) {
           errors.push(
             `${SECTION_LABELS[sectionKey]} provider #${i + 1} game #${j + 1}: finalGameId must be a positive integer`,
           )
           return {ok: false, errors}
         }
 
-        if (toNumberOrNull(gameRule?.xpPerAmount) == null || Number(gameRule.xpPerAmount) < 0) {
+        if (
+          toNumberOrNull(gameRule?.xpPerAmount) == null ||
+          Number(gameRule.xpPerAmount) < 0
+        ) {
           errors.push(
             `${SECTION_LABELS[sectionKey]} provider #${i + 1} game #${j + 1}: xpPerAmount must be a non-negative number`,
           )
@@ -331,7 +353,7 @@ export default function LevelsPage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('levels')
+  const [activeTab, setActiveTab] = useState('configs-and-rules')
   const [configSectionKey, setConfigSectionKey] = useState(null)
 
   const [sectionCatalogs, setSectionCatalogs] = useState({})
@@ -346,6 +368,9 @@ export default function LevelsPage() {
 
   const [levels, setLevels] = useState([])
 
+  const [savedGlobalConfigs, setSavedGlobalConfigs] = useState(null)
+  const [savedSectionRules, setSavedSectionRules] = useState({})
+
   async function loadLevels() {
     const data = await api.getLevels()
     const list = Array.isArray(data?.levels) ? data.levels : []
@@ -357,10 +382,23 @@ export default function LevelsPage() {
     const configs = data?.configs ?? {}
     const globalXpPerAmount = String(configs?.xpPerAmount ?? 1)
 
-    setEnabled(Boolean(configs?.enabled))
-    setTimeRangeDays(String(configs?.timeRangeDays ?? 180))
-    setXpPerAmount(globalXpPerAmount)
-    setSectionRules(normalizeSectionRules(data?.sectionRules, globalXpPerAmount))
+    const nextEnabled = Boolean(configs?.enabled)
+    const nextTimeRangeDays = String(configs?.timeRangeDays ?? 180)
+    const nextXpPerAmount = globalXpPerAmount
+    const nextSectionRules = normalizeSectionRules(data?.sectionRules, globalXpPerAmount)
+
+    setEnabled(nextEnabled)
+    setTimeRangeDays(nextTimeRangeDays)
+    setXpPerAmount(nextXpPerAmount)
+    setSectionRules(nextSectionRules)
+
+    setSavedGlobalConfigs({
+      enabled: nextEnabled,
+      timeRangeDays: nextTimeRangeDays,
+      xpPerAmount: nextXpPerAmount,
+    })
+
+    setSavedSectionRules(nextSectionRules)
   }
 
   async function loadSectionProviders(sectionKey) {
@@ -711,61 +749,6 @@ export default function LevelsPage() {
     setConfigSectionKey(null)
   }
 
-  function updateProviderRule(sectionKey, providerRuleId, patch) {
-    setSectionRules(prev => {
-      const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...currentSectionRule,
-          providerRules: currentSectionRule.providerRules.map(providerRule =>
-            providerRule._id === providerRuleId
-              ? {
-                ...providerRule,
-                ...patch,
-              }
-              : providerRule,
-          ),
-        },
-      }
-    })
-  }
-
-  function updateGameRule(sectionKey, providerRuleId, gameRuleId, patch) {
-    setSectionRules(prev => {
-      const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...currentSectionRule,
-          providerRules: currentSectionRule.providerRules.map(providerRule =>
-            providerRule._id === providerRuleId
-              ? {
-                ...providerRule,
-                gameRules: providerRule.gameRules.map(gameRule =>
-                  gameRule._id === gameRuleId
-                    ? {
-                      ...gameRule,
-                      ...patch,
-                    }
-                    : gameRule,
-                ),
-              }
-              : providerRule,
-          ),
-        },
-      }
-    })
-  }
-
   const levelsPreviewPayload = useMemo(() => {
     return {
       levels: levels.map(level => {
@@ -896,53 +879,286 @@ export default function LevelsPage() {
     }
   }, [enabled, timeRangeDays, xpPerAmount, sectionRules])
 
-  async function save() {
-    if (activeTab === 'levels') {
-      const validation = validateLevelsSetupPayload({
-        ...configsAndRulesPreviewPayload.configs,
-        levels: levelsPreviewPayload.levels,
-      })
+  function buildSectionPayload(sectionKey) {
+    const sectionRule = sectionRules[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
 
-      if (!validation.ok) {
-        const msg = validation.errors[0] || 'Please fix validation errors'
-        setErr(msg)
-        toast.error(msg)
-        return
-      }
+    const providerRules =
+      sectionKey === 'sport'
+        ? []
+        : sectionRule.providerRules
+          .map(providerRule => {
+            const parentXp = String(sectionRule.xpPerAmount)
+            const defaultEnabled = Boolean(sectionRule.providersDefaultEnabled)
+
+            const gameRules = providerRule.gameRules
+              .filter(gameRule => {
+                const providerDefaultEnabled = Boolean(providerRule.gamesDefaultEnabled)
+                const providerDefaultXp = String(providerRule.xpPerAmount)
+
+                return (
+                  Boolean(gameRule.enabled) !== providerDefaultEnabled ||
+                  String(gameRule.xpPerAmount) !== providerDefaultXp
+                )
+              })
+              .map(gameRule => ({
+                finalGameId: Number(gameRule.finalGameId),
+                enabled: gameRule.enabled ? 1 : 0,
+                xpPerAmount: Number(gameRule.xpPerAmount),
+              }))
+
+            const providerChanged =
+              Boolean(providerRule.enabled) !== defaultEnabled ||
+              String(providerRule.xpPerAmount) !== parentXp ||
+              Boolean(providerRule.gamesDefaultEnabled) !== true ||
+              gameRules.length > 0
+
+            if (!providerChanged) {
+              return null
+            }
+
+            return {
+              finalProviderId: Number(providerRule.finalProviderId),
+              enabled: providerRule.enabled ? 1 : 0,
+              gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
+              xpPerAmount: Number(providerRule.xpPerAmount),
+              gameRules,
+            }
+          })
+          .filter(Boolean)
+
+    return {
+      configs: {},
+      sectionRules: {
+        [sectionKey]: {
+          enabled: sectionRule.enabled ? 1 : 0,
+          providersDefaultEnabled: sectionRule.providersDefaultEnabled ? 1 : 0,
+          xpPerAmount: Number(sectionRule.xpPerAmount),
+          providerRules,
+        },
+      },
+    }
+  }
+
+  function getComparableSectionRule(sectionKey, source) {
+    const sectionRule = source?.[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+
+    return JSON.stringify(buildSectionPayload(sectionKey).sectionRules[sectionKey]) ===
+      JSON.stringify({
+        enabled: sectionRule.enabled ? 1 : 0,
+        providersDefaultEnabled: sectionRule.providersDefaultEnabled ? 1 : 0,
+        xpPerAmount: Number(sectionRule.xpPerAmount),
+        providerRules:
+          sectionKey === 'sport'
+            ? []
+            : sectionRule.providerRules
+              .map(providerRule => {
+                const parentXp = String(sectionRule.xpPerAmount)
+                const defaultEnabled = Boolean(sectionRule.providersDefaultEnabled)
+
+                const gameRules = providerRule.gameRules
+                  .filter(gameRule => {
+                    const providerDefaultEnabled = Boolean(providerRule.gamesDefaultEnabled)
+                    const providerDefaultXp = String(providerRule.xpPerAmount)
+
+                    return (
+                      Boolean(gameRule.enabled) !== providerDefaultEnabled ||
+                      String(gameRule.xpPerAmount) !== providerDefaultXp
+                    )
+                  })
+                  .map(gameRule => ({
+                    finalGameId: Number(gameRule.finalGameId),
+                    enabled: gameRule.enabled ? 1 : 0,
+                    xpPerAmount: Number(gameRule.xpPerAmount),
+                  }))
+
+                const providerChanged =
+                  Boolean(providerRule.enabled) !== defaultEnabled ||
+                  String(providerRule.xpPerAmount) !== parentXp ||
+                  Boolean(providerRule.gamesDefaultEnabled) !== true ||
+                  gameRules.length > 0
+
+                if (!providerChanged) {
+                  return null
+                }
+
+                return {
+                  finalProviderId: Number(providerRule.finalProviderId),
+                  enabled: providerRule.enabled ? 1 : 0,
+                  gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
+                  xpPerAmount: Number(providerRule.xpPerAmount),
+                  gameRules,
+                }
+              })
+              .filter(Boolean),
+      })
+  }
+
+  function isSectionDirty(sectionKey) {
+    const currentPayload = buildSectionPayload(sectionKey).sectionRules[sectionKey]
+
+    const savedRule = savedSectionRules?.[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+
+    const savedPayload = {
+      enabled: savedRule.enabled ? 1 : 0,
+      providersDefaultEnabled: savedRule.providersDefaultEnabled ? 1 : 0,
+      xpPerAmount: Number(savedRule.xpPerAmount),
+      providerRules:
+        sectionKey === 'sport'
+          ? []
+          : savedRule.providerRules
+            .map(providerRule => {
+              const parentXp = String(savedRule.xpPerAmount)
+              const defaultEnabled = Boolean(savedRule.providersDefaultEnabled)
+
+              const gameRules = providerRule.gameRules
+                .filter(gameRule => {
+                  const providerDefaultEnabled = Boolean(providerRule.gamesDefaultEnabled)
+                  const providerDefaultXp = String(providerRule.xpPerAmount)
+
+                  return (
+                    Boolean(gameRule.enabled) !== providerDefaultEnabled ||
+                    String(gameRule.xpPerAmount) !== providerDefaultXp
+                  )
+                })
+                .map(gameRule => ({
+                  finalGameId: Number(gameRule.finalGameId),
+                  enabled: gameRule.enabled ? 1 : 0,
+                  xpPerAmount: Number(gameRule.xpPerAmount),
+                }))
+
+              const providerChanged =
+                Boolean(providerRule.enabled) !== defaultEnabled ||
+                String(providerRule.xpPerAmount) !== parentXp ||
+                Boolean(providerRule.gamesDefaultEnabled) !== true ||
+                gameRules.length > 0
+
+              if (!providerChanged) {
+                return null
+              }
+
+              return {
+                finalProviderId: Number(providerRule.finalProviderId),
+                enabled: providerRule.enabled ? 1 : 0,
+                gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
+                xpPerAmount: Number(providerRule.xpPerAmount),
+                gameRules,
+              }
+            })
+            .filter(Boolean),
     }
 
-    if (activeTab === 'configs-and-rules') {
-      const validation = validateConfigsAndRulesPayload(configsAndRulesPreviewPayload)
+    return JSON.stringify(currentPayload) !== JSON.stringify(savedPayload)
+  }
 
-      if (!validation.ok) {
-        const msg = validation.errors[0] || 'Please fix validation errors'
-        setErr(msg)
-        toast.error(msg)
-        return
-      }
+  const isGlobalConfigsDirty = useMemo(() => {
+    if (!savedGlobalConfigs) return false
+
+    return (
+      savedGlobalConfigs.enabled !== enabled ||
+      String(savedGlobalConfigs.timeRangeDays) !== String(timeRangeDays) ||
+      String(savedGlobalConfigs.xpPerAmount) !== String(xpPerAmount)
+    )
+  }, [savedGlobalConfigs, enabled, timeRangeDays, xpPerAmount])
+
+  async function saveLevels() {
+    const validation = validateLevelsSetupPayload({
+      ...configsAndRulesPreviewPayload.configs,
+      levels: levelsPreviewPayload.levels,
+    })
+
+    if (!validation.ok) {
+      const msg = validation.errors[0] || 'Please fix validation errors'
+      setErr(msg)
+      toast.error(msg)
+      return
     }
 
     setSaving(true)
     setErr(null)
 
     try {
-      if (activeTab === 'levels') {
-        await api.setupLevels(levelsPreviewPayload)
-        await loadLevels()
-        toast.success('Levels saved')
-      } else {
-        await api.setupLevelsConfigsAndRules(configsAndRulesPreviewPayload)
-        await loadConfigsAndRules()
-        toast.success('Configs and rules saved')
-      }
+      await api.setupLevels(levelsPreviewPayload)
+      await loadLevels()
+      toast.success('Levels saved')
     } catch (e) {
       const msg = e?.message || String(e)
       setErr(msg)
-      toast.error(
-        activeTab === 'levels'
-          ? `Failed to save levels: ${msg}`
-          : `Failed to save configs and rules: ${msg}`,
-      )
+      toast.error(`Failed to save levels: ${msg}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveGlobalConfigs() {
+    const payload = {
+      configs: {
+        enabled: enabled ? 1 : 0,
+        timeRangeDays: Number(timeRangeDays),
+        xpPerAmount: Number(xpPerAmount),
+      },
+    }
+
+    const validation = validateConfigsAndRulesPayload(payload)
+
+    if (!validation.ok) {
+      const msg = validation.errors[0] || 'Please fix validation errors'
+      setErr(msg)
+      toast.error(msg)
+      return
+    }
+
+    setSaving(true)
+    setErr(null)
+
+    try {
+      await api.setupLevelsConfigsAndRules(payload)
+
+      setSavedGlobalConfigs({
+        enabled,
+        timeRangeDays,
+        xpPerAmount,
+      })
+
+      toast.success('Global configs saved')
+    } catch (e) {
+      const msg = e?.message || String(e)
+      setErr(msg)
+      toast.error(`Failed to save global configs: ${msg}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveSection(sectionKey) {
+    const payload = {
+      sectionRules: buildSectionPayload(sectionKey).sectionRules,
+    }
+
+    const validation = validateConfigsAndRulesPayload(payload)
+
+    if (!validation.ok) {
+      const msg = validation.errors[0] || 'Please fix validation errors'
+      setErr(msg)
+      toast.error(msg)
+      return
+    }
+
+    setSaving(true)
+    setErr(null)
+
+    try {
+      await api.setupLevelsConfigsAndRules(payload)
+
+      setSavedSectionRules(prev => ({
+        ...prev,
+        [sectionKey]: normalizeSectionRule(sectionKey, sectionRules[sectionKey], xpPerAmount),
+      }))
+
+      toast.success(`${SECTION_LABELS[sectionKey]} saved`)
+    } catch (e) {
+      const msg = e?.message || String(e)
+      setErr(msg)
+      toast.error(`Failed to save ${SECTION_LABELS[sectionKey]}: ${msg}`)
     } finally {
       setSaving(false)
     }
@@ -953,7 +1169,10 @@ export default function LevelsPage() {
       compact = false,
       withConfigureButton = false,
       withAddProviderButton = false,
+      withSaveButton = false,
     } = options
+
+    const sectionDirty = savedSectionRules?.[sectionKey] ? isSectionDirty(sectionKey) : false
 
     return (
       <div className={`sectionSettingsCard ${compact ? 'sectionSettingsCard--compact' : ''}`}>
@@ -996,34 +1215,39 @@ export default function LevelsPage() {
             />
           </div>
 
-          <div className="field">
-            <div className="label">providersDefaultEnabled</div>
-            <ToggleSwitch
-              checked={sectionRule.providersDefaultEnabled}
-              onChange={value => updateSectionRule(sectionKey, {providersDefaultEnabled: value})}
-              variant="secondary"
-              size="sm"
-            />
-          </div>
-        </div>
-
-        <div className="sectionSettingsCard__bottom">
-          <div className="sectionSettingsCard__bottomLeft">
-            <div className="hint">
-              {sectionKey === 'sport' ? 'No provider rules for sport' : ''}
+          {withAddProviderButton && (
+            <div className="field">
+              <div className="label">providersDefaultEnabled</div>
+              <ToggleSwitch
+                checked={sectionRule.providersDefaultEnabled}
+                onChange={value => updateSectionRule(sectionKey, {providersDefaultEnabled: value})}
+                variant="secondary"
+                size="sm"
+              />
             </div>
-          </div>
+          )}
 
-          <div className="sectionSettingsCard__bottomRight">
-            {withConfigureButton ? (
+          <div className="field sectionSettingsActions">
+            <div className="sectionSettingsActions__inner">
+              {withConfigureButton ? (
+                <button
+                  type="button"
+                  className="btn btn--primary sectionSettingsActions__configure"
+                  onClick={() => openSectionConfig(sectionKey)}
+                >
+                  Configure
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                className="btn btn--primary"
-                onClick={() => openSectionConfig(sectionKey)}
+                className={`btn sectionSettingsActions__save ${withSaveButton && sectionDirty ? '' : 'is-hidden'}`}
+                onClick={() => saveSection(sectionKey)}
+                disabled={saving || !sectionDirty}
               >
-                Configure
+                Save
               </button>
-            ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -1043,7 +1267,11 @@ export default function LevelsPage() {
             Refresh
           </button>
 
-          <button className="btn btn--primary" onClick={save} disabled={loading || saving}>
+          <button
+            className="btn btn--primary"
+            onClick={activeTab === 'levels' ? saveLevels : saveGlobalConfigs}
+            disabled={loading || saving || (activeTab === 'configs-and-rules' && !isGlobalConfigsDirty)}
+          >
             Save
           </button>
         </div>
@@ -1138,6 +1366,7 @@ export default function LevelsPage() {
                       compact: true,
                       withConfigureButton: true,
                       withAddProviderButton: false,
+                      withSaveButton: true,
                     })}
                   </div>
                 )
@@ -1177,7 +1406,7 @@ export default function LevelsPage() {
                         <div className="stack">
                           {renderSectionSettingsBlock(sectionKey, sectionRule, {
                             withConfigureButton: false,
-                            withAddProviderButton: false,
+                            withAddProviderButton: true,
                           })}
 
                           {sectionKey === 'sport' ? (
@@ -1408,10 +1637,23 @@ export default function LevelsPage() {
                     <button
                       style={{minWidth: 120}}
                       type="button"
-                      className="btn btn--primary"
+                      className="btn"
                       onClick={closeSectionConfig}
                     >
-                      Ok
+                      Close
+                    </button>
+
+                    <button
+                      style={{minWidth: 120}}
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={async () => {
+                        await saveSection(configSectionKey)
+                        closeSectionConfig()
+                      }}
+                      disabled={saving || !isSectionDirty(configSectionKey)}
+                    >
+                      Save
                     </button>
                   </div>
                 </div>

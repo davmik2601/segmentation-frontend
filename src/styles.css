@@ -1188,6 +1188,24 @@ select option {
     }
 }
 
+.sectionSettingsActions {
+    padding-top: 22px; /* same visual space as label area */
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+.sectionSettingsActions__inner {
+    margin-left: auto;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 8px;
+    align-items: center;
+}
+.sectionSettingsActions__save.is-hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .sectionSettingsCard__bottom {
     display: flex;
     align-items: center;
