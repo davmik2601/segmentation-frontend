@@ -1427,6 +1427,9 @@ select option {
 .gameRuleCard.is-game-disabled {
     background: rgba(82, 46, 46, 0.2);
 }
+.gameRuleCard.is-changed {
+    background: rgba(59, 154, 27, 0.4);
+}
 
 .providerRuleCard.is-disabled {
     background: rgba(77, 122, 53, 0.12);
