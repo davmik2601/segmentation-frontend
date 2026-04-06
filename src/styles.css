@@ -1189,13 +1189,21 @@ select option {
 }
 
 .sectionSettingsActions {
-    padding-top: 22px; /* same visual space as label area */
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
+    grid-column: -2 / -1;
+    padding-top: 22px;
+    width: max-content;
+    justify-self: end;
+    align-self: end;
+}
+.sectionSettingsActions.field {
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+    padding-top: 22px;
+    justify-self: end;
+    align-self: end;
 }
 .sectionSettingsActions__inner {
-    margin-left: auto;
     display: grid;
     grid-template-columns: auto auto;
     gap: 8px;

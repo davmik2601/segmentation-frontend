@@ -1229,6 +1229,15 @@ export default function LevelsPage() {
 
           <div className="field sectionSettingsActions">
             <div className="sectionSettingsActions__inner">
+              <button
+                type="button"
+                className={`btn sectionSettingsActions__save ${withSaveButton && sectionDirty ? '' : 'is-hidden'}`}
+                onClick={() => saveSection(sectionKey)}
+                disabled={saving || !sectionDirty}
+              >
+                Save
+              </button>
+
               {withConfigureButton ? (
                 <button
                   type="button"
@@ -1238,15 +1247,6 @@ export default function LevelsPage() {
                   Configure
                 </button>
               ) : null}
-
-              <button
-                type="button"
-                className={`btn sectionSettingsActions__save ${withSaveButton && sectionDirty ? '' : 'is-hidden'}`}
-                onClick={() => saveSection(sectionKey)}
-                disabled={saving || !sectionDirty}
-              >
-                Save
-              </button>
             </div>
           </div>
         </div>
