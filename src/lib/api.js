@@ -15,8 +15,10 @@ function withPrefix(method, body) {
   return {...body, prefix: API_PREFIX}
 }
 
-async function req(path, {method = 'GET', body} = {}) {
-  body = withPrefix(method, body)
+async function req(path, {method = 'GET', body} = {}, addPrefix = true) {
+  if (addPrefix) {
+    body = withPrefix(method, body)
+  }
 
   let url = `${BASE}${path}`
 
@@ -162,4 +164,18 @@ export const api = {
         interval,
       },
     }),
+
+  getFinalProvidersBySection: ({sectionId, limit = 500}) =>
+    req(
+      `https://api-back-stg.ma-ruay.com/api/backoffice/v1/final-providers-project/get-by-params?sectionId=${sectionId}&limit=${limit}`,
+      {},
+      false,
+    ),
+
+  getFinalGamesByProvider: ({finalProviderId, offset = 0, limit = 10000}) =>
+    req(
+      `https://api-back-stg.ma-ruay.com/api/backoffice/v1/final-games-project/get-by-params?offset=${offset}&finalProviderIds=${finalProviderId}&limit=${limit}`,
+      {},
+      false,
+    ),
 }

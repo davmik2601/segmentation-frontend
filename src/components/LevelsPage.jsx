@@ -6,11 +6,25 @@ import {validateLevelsSetupPayload} from '../lib/validation.js'
 
 const LEVEL_SECTIONS = ['sport', 'casino', 'virtual-sport', 'live-casino']
 
+const SECTION_PROVIDER_API_IDS = {
+  casino: 1,
+  'live-casino': 2,
+  'virtual-sport': 3,
+}
+
 const SECTION_LABELS = {
   sport: 'Sport',
   casino: 'Casino',
   'virtual-sport': 'Virtual Sport',
   'live-casino': 'Live Casino',
+}
+
+function getSectionProviderApiId(sectionKey) {
+  return SECTION_PROVIDER_API_IDS[sectionKey] ?? null
+}
+
+function sortByName(a, b) {
+  return String(a?.name || '').localeCompare(String(b?.name || ''))
 }
 
 function toIntOrNull(v) {
@@ -111,15 +125,6 @@ function recalculateLevels(levels) {
   return next
 }
 
-function buildEmptyGameRule(parentXpPerAmount = '1') {
-  return {
-    _id: uid(),
-    finalGameId: '',
-    enabled: true,
-    xpPerAmount: String(parentXpPerAmount ?? '1'),
-  }
-}
-
 function normalizeGameRule(gameRule, parentXpPerAmount = '1') {
   return {
     _id: uid(),
@@ -129,17 +134,6 @@ function normalizeGameRule(gameRule, parentXpPerAmount = '1') {
     xpPerAmount: String(
       gameRule?.xpPerAmount != null ? gameRule.xpPerAmount : parentXpPerAmount,
     ),
-  }
-}
-
-function buildEmptyProviderRule(parentXpPerAmount = '1') {
-  return {
-    _id: uid(),
-    finalProviderId: '',
-    enabled: true,
-    gamesDefaultEnabled: true,
-    xpPerAmount: String(parentXpPerAmount ?? '1'),
-    gameRules: [],
   }
 }
 
@@ -340,6 +334,11 @@ export default function LevelsPage() {
   const [activeTab, setActiveTab] = useState('levels')
   const [configSectionKey, setConfigSectionKey] = useState(null)
 
+  const [sectionCatalogs, setSectionCatalogs] = useState({})
+  const [sectionCatalogsLoading, setSectionCatalogsLoading] = useState({})
+  const [sectionCatalogsLoaded, setSectionCatalogsLoaded] = useState({})
+  const [selectedProviderIdsBySection, setSelectedProviderIdsBySection] = useState({})
+
   const [enabled, setEnabled] = useState(false)
   const [timeRangeDays, setTimeRangeDays] = useState('180')
   const [xpPerAmount, setXpPerAmount] = useState('1')
@@ -364,6 +363,96 @@ export default function LevelsPage() {
     setSectionRules(normalizeSectionRules(data?.sectionRules, globalXpPerAmount))
   }
 
+  async function loadSectionProviders(sectionKey) {
+    if (sectionKey === 'sport') return
+
+    const sectionId = getSectionProviderApiId(sectionKey)
+    if (!sectionId) return
+
+    setSectionCatalogsLoading(prev => ({...prev, [sectionKey]: true}))
+
+    try {
+      const data = await api.getFinalProvidersBySection({
+        sectionId,
+        limit: 500,
+      })
+
+      const providers = Array.isArray(data?.data) ? data.data.slice().sort(sortByName) : []
+
+      setSectionCatalogs(prev => {
+        const prevSection = prev[sectionKey] ?? {}
+        return {
+          ...prev,
+          [sectionKey]: {
+            ...prevSection,
+            providers,
+            gamesByProviderId: prevSection.gamesByProviderId ?? {},
+          },
+        }
+      })
+
+      setSectionCatalogsLoaded(prev => ({...prev, [sectionKey]: true}))
+
+      setSelectedProviderIdsBySection(prev => {
+        if (prev[sectionKey]) return prev
+        const firstProviderId = providers[0]?.finalProviderId
+        return firstProviderId
+          ? {...prev, [sectionKey]: String(firstProviderId)}
+          : prev
+      })
+    } finally {
+      setSectionCatalogsLoading(prev => ({...prev, [sectionKey]: false}))
+    }
+  }
+
+  async function loadProviderGames(sectionKey, finalProviderId) {
+    if (!sectionKey || !finalProviderId) return
+
+    const providerIdStr = String(finalProviderId)
+
+    const alreadyLoaded =
+      sectionCatalogs?.[sectionKey]?.gamesByProviderId?.[providerIdStr]
+
+    if (alreadyLoaded) {
+      return
+    }
+
+    setSectionCatalogsLoading(prev => ({
+      ...prev,
+      [sectionKey]: true,
+    }))
+
+    try {
+      const data = await api.getFinalGamesByProvider({
+        finalProviderId,
+        offset: 0,
+        limit: 10000,
+      })
+
+      const games = Array.isArray(data?.data) ? data.data.slice().sort(sortByName) : []
+
+      setSectionCatalogs(prev => {
+        const prevSection = prev[sectionKey] ?? {}
+        return {
+          ...prev,
+          [sectionKey]: {
+            ...prevSection,
+            providers: prevSection.providers ?? [],
+            gamesByProviderId: {
+              ...(prevSection.gamesByProviderId ?? {}),
+              [providerIdStr]: games,
+            },
+          },
+        }
+      })
+    } finally {
+      setSectionCatalogsLoading(prev => ({
+        ...prev,
+        [sectionKey]: false,
+      }))
+    }
+  }
+
   async function load() {
     setLoading(true)
     setErr(null)
@@ -383,6 +472,19 @@ export default function LevelsPage() {
   useEffect(() => {
     load()
   }, [])
+
+  useEffect(() => {
+    if (!configSectionKey || configSectionKey === 'sport') return
+
+    const selectedProviderId = selectedProviderIdsBySection[configSectionKey]
+    if (!selectedProviderId) return
+
+    loadProviderGames(configSectionKey, selectedProviderId).catch(e => {
+      const msg = e?.message || String(e)
+      setErr(msg)
+      toast.error(`Failed to load provider games: ${msg}`)
+    })
+  }, [configSectionKey, selectedProviderIdsBySection, sectionCatalogs])
 
   function updateLevel(levelId, patch) {
     setLevels(prev => {
@@ -481,32 +583,132 @@ export default function LevelsPage() {
     }))
   }
 
-  function openSectionConfig(sectionKey) {
-    setConfigSectionKey(sectionKey)
-  }
+  function upsertProviderRuleByFinalProviderId(sectionKey, finalProviderId, patch = {}) {
+    const providerIdStr = String(finalProviderId)
 
-  function closeSectionConfig() {
-    setConfigSectionKey(null)
-  }
-
-  function addProviderRule(sectionKey) {
     setSectionRules(prev => {
       const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule || sectionKey === 'sport') {
-        return prev
+      if (!currentSectionRule) return prev
+
+      const existing = currentSectionRule.providerRules.find(
+        item => String(item.finalProviderId) === providerIdStr,
+      )
+
+      let nextProviderRules
+
+      if (existing) {
+        nextProviderRules = currentSectionRule.providerRules.map(item =>
+          String(item.finalProviderId) === providerIdStr
+            ? {...item, ...patch}
+            : item,
+        )
+      } else {
+        nextProviderRules = [
+          ...currentSectionRule.providerRules,
+          normalizeProviderRule({
+            finalProviderId: providerIdStr,
+            enabled: currentSectionRule.providersDefaultEnabled,
+            gamesDefaultEnabled: true,
+            xpPerAmount: currentSectionRule.xpPerAmount,
+            gameRules: [],
+            ...patch,
+          }, currentSectionRule.xpPerAmount),
+        ]
       }
 
       return {
         ...prev,
         [sectionKey]: {
           ...currentSectionRule,
-          providerRules: [
-            buildEmptyProviderRule(currentSectionRule.xpPerAmount),
-            ...currentSectionRule.providerRules,
-          ],
+          providerRules: nextProviderRules,
         },
       }
     })
+  }
+
+  function upsertGameRuleByFinalIds(sectionKey, finalProviderId, finalGameId, patch = {}) {
+    const providerIdStr = String(finalProviderId)
+    const gameIdStr = String(finalGameId)
+
+    setSectionRules(prev => {
+      const currentSectionRule = prev[sectionKey]
+      if (!currentSectionRule) return prev
+
+      const providerRule = currentSectionRule.providerRules.find(
+        item => String(item.finalProviderId) === providerIdStr,
+      )
+
+      const baseProviderRule = providerRule
+        ? providerRule
+        : normalizeProviderRule({
+          finalProviderId: providerIdStr,
+          enabled: currentSectionRule.providersDefaultEnabled,
+          gamesDefaultEnabled: true,
+          xpPerAmount: currentSectionRule.xpPerAmount,
+          gameRules: [],
+        }, currentSectionRule.xpPerAmount)
+
+      const existingGameRule = baseProviderRule.gameRules.find(
+        item => String(item.finalGameId) === gameIdStr,
+      )
+
+      const nextGameRules = existingGameRule
+        ? baseProviderRule.gameRules.map(item =>
+          String(item.finalGameId) === gameIdStr
+            ? {...item, ...patch}
+            : item,
+        )
+        : [
+          ...baseProviderRule.gameRules,
+          normalizeGameRule({
+            finalGameId: gameIdStr,
+            enabled: baseProviderRule.gamesDefaultEnabled,
+            xpPerAmount: baseProviderRule.xpPerAmount,
+            ...patch,
+          }, baseProviderRule.xpPerAmount),
+        ]
+
+      const nextProviderRules = providerRule
+        ? currentSectionRule.providerRules.map(item =>
+          String(item.finalProviderId) === providerIdStr
+            ? {...item, gameRules: nextGameRules}
+            : item,
+        )
+        : [
+          ...currentSectionRule.providerRules,
+          {...baseProviderRule, gameRules: nextGameRules},
+        ]
+
+      return {
+        ...prev,
+        [sectionKey]: {
+          ...currentSectionRule,
+          providerRules: nextProviderRules,
+        },
+      }
+    })
+  }
+
+  async function openSectionConfig(sectionKey) {
+    setConfigSectionKey(sectionKey)
+
+    if (sectionKey === 'sport') {
+      return
+    }
+
+    if (!sectionCatalogsLoaded[sectionKey]) {
+      try {
+        await loadSectionProviders(sectionKey)
+      } catch (e) {
+        const msg = e?.message || String(e)
+        setErr(msg)
+        toast.error(`Failed to load ${SECTION_LABELS[sectionKey]} providers: ${msg}`)
+      }
+    }
+  }
+
+  function closeSectionConfig() {
+    setConfigSectionKey(null)
   }
 
   function updateProviderRule(sectionKey, providerRuleId, patch) {
@@ -525,52 +727,6 @@ export default function LevelsPage() {
               ? {
                 ...providerRule,
                 ...patch,
-              }
-              : providerRule,
-          ),
-        },
-      }
-    })
-  }
-
-  function removeProviderRule(sectionKey, providerRuleId) {
-    setSectionRules(prev => {
-      const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...currentSectionRule,
-          providerRules: currentSectionRule.providerRules.filter(
-            providerRule => providerRule._id !== providerRuleId,
-          ),
-        },
-      }
-    })
-  }
-
-  function addGameRule(sectionKey, providerRuleId) {
-    setSectionRules(prev => {
-      const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...currentSectionRule,
-          providerRules: currentSectionRule.providerRules.map(providerRule =>
-            providerRule._id === providerRuleId
-              ? {
-                ...providerRule,
-                gameRules: [
-                  buildEmptyGameRule(providerRule.xpPerAmount),
-                  ...providerRule.gameRules,
-                ],
               }
               : providerRule,
           ),
@@ -610,32 +766,6 @@ export default function LevelsPage() {
     })
   }
 
-  function removeGameRule(sectionKey, providerRuleId, gameRuleId) {
-    setSectionRules(prev => {
-      const currentSectionRule = prev[sectionKey]
-      if (!currentSectionRule) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        [sectionKey]: {
-          ...currentSectionRule,
-          providerRules: currentSectionRule.providerRules.map(providerRule =>
-            providerRule._id === providerRuleId
-              ? {
-                ...providerRule,
-                gameRules: providerRule.gameRules.filter(
-                  gameRule => gameRule._id !== gameRuleId,
-                ),
-              }
-              : providerRule,
-          ),
-        },
-      }
-    })
-  }
-
   const levelsPreviewPayload = useMemo(() => {
     return {
       levels: levels.map(level => {
@@ -661,6 +791,47 @@ export default function LevelsPage() {
     }
   }, [levels])
 
+  function getProviderRuleByFinalProviderId(sectionKey, finalProviderId) {
+    const sectionRule = sectionRules[sectionKey]
+    if (!sectionRule) return null
+
+    return sectionRule.providerRules.find(
+      item => String(item.finalProviderId) === String(finalProviderId),
+    ) ?? null
+  }
+
+  function getGameRuleByFinalIds(sectionKey, finalProviderId, finalGameId) {
+    const providerRule = getProviderRuleByFinalProviderId(sectionKey, finalProviderId)
+    if (!providerRule) return null
+
+    return providerRule.gameRules.find(
+      item => String(item.finalGameId) === String(finalGameId),
+    ) ?? null
+  }
+
+  function getEffectiveProviderValues(sectionKey, finalProviderId) {
+    const sectionRule = sectionRules[sectionKey] ?? buildEmptySectionRule(xpPerAmount)
+    const providerRule = getProviderRuleByFinalProviderId(sectionKey, finalProviderId)
+
+    return {
+      enabled: providerRule ? providerRule.enabled : sectionRule.providersDefaultEnabled,
+      xpPerAmount: providerRule ? providerRule.xpPerAmount : sectionRule.xpPerAmount,
+      gamesDefaultEnabled: providerRule ? providerRule.gamesDefaultEnabled : true,
+      providerRule,
+    }
+  }
+
+  function getEffectiveGameValues(sectionKey, finalProviderId, finalGameId) {
+    const providerValues = getEffectiveProviderValues(sectionKey, finalProviderId)
+    const gameRule = getGameRuleByFinalIds(sectionKey, finalProviderId, finalGameId)
+
+    return {
+      enabled: gameRule ? gameRule.enabled : providerValues.gamesDefaultEnabled,
+      xpPerAmount: gameRule ? gameRule.xpPerAmount : providerValues.xpPerAmount,
+      gameRule,
+    }
+  }
+
   const configsAndRulesPreviewPayload = useMemo(() => {
     return {
       configs: {
@@ -678,17 +849,46 @@ export default function LevelsPage() {
           providerRules:
             sectionKey === 'sport'
               ? []
-              : sectionRule.providerRules.map(providerRule => ({
-                finalProviderId: Number(providerRule.finalProviderId),
-                enabled: providerRule.enabled ? 1 : 0,
-                gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
-                xpPerAmount: Number(providerRule.xpPerAmount),
-                gameRules: providerRule.gameRules.map(gameRule => ({
-                  finalGameId: Number(gameRule.finalGameId),
-                  enabled: gameRule.enabled ? 1 : 0,
-                  xpPerAmount: Number(gameRule.xpPerAmount),
-                })),
-              })),
+              : sectionRule.providerRules
+                .map(providerRule => {
+                  const parentXp = String(sectionRule.xpPerAmount)
+                  const defaultEnabled = Boolean(sectionRule.providersDefaultEnabled)
+
+                  const gameRules = providerRule.gameRules
+                    .filter(gameRule => {
+                      const providerDefaultEnabled = Boolean(providerRule.gamesDefaultEnabled)
+                      const providerDefaultXp = String(providerRule.xpPerAmount)
+
+                      return (
+                        Boolean(gameRule.enabled) !== providerDefaultEnabled ||
+                        String(gameRule.xpPerAmount) !== providerDefaultXp
+                      )
+                    })
+                    .map(gameRule => ({
+                      finalGameId: Number(gameRule.finalGameId),
+                      enabled: gameRule.enabled ? 1 : 0,
+                      xpPerAmount: Number(gameRule.xpPerAmount),
+                    }))
+
+                  const providerChanged =
+                    Boolean(providerRule.enabled) !== defaultEnabled ||
+                    String(providerRule.xpPerAmount) !== parentXp ||
+                    Boolean(providerRule.gamesDefaultEnabled) !== true ||
+                    gameRules.length > 0
+
+                  if (!providerChanged) {
+                    return null
+                  }
+
+                  return {
+                    finalProviderId: Number(providerRule.finalProviderId),
+                    enabled: providerRule.enabled ? 1 : 0,
+                    gamesDefaultEnabled: providerRule.gamesDefaultEnabled ? 1 : 0,
+                    xpPerAmount: Number(providerRule.xpPerAmount),
+                    gameRules,
+                  }
+                })
+                .filter(Boolean),
         }
 
         return acc
@@ -769,7 +969,7 @@ export default function LevelsPage() {
             <div className="hint">
               {sectionKey === 'sport'
                 ? 'Sport section does not use provider rules'
-                : `${sectionRule.providerRules.length} provider rule${sectionRule.providerRules.length === 1 ? '' : 's'}`}
+                : 'Configure providers and games'}
             </div>
           </div>
         </div>
@@ -809,19 +1009,9 @@ export default function LevelsPage() {
 
         <div className="sectionSettingsCard__bottom">
           <div className="sectionSettingsCard__bottomLeft">
-            {sectionKey !== 'sport' && withAddProviderButton ? (
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => addProviderRule(sectionKey)}
-              >
-                + Add provider rule
-              </button>
-            ) : (
-              <div className="hint">
-                {sectionKey === 'sport' ? 'No provider rules for sport' : ''}
-              </div>
-            )}
+            <div className="hint">
+              {sectionKey === 'sport' ? 'No provider rules for sport' : ''}
+            </div>
           </div>
 
           <div className="sectionSettingsCard__bottomRight">
@@ -987,155 +1177,190 @@ export default function LevelsPage() {
                         <div className="stack">
                           {renderSectionSettingsBlock(sectionKey, sectionRule, {
                             withConfigureButton: false,
-                            withAddProviderButton: true,
+                            withAddProviderButton: false,
                           })}
 
                           {sectionKey === 'sport' ? (
                             <div className="empty">
                               Sport section does not use provider rules. providerRules will always be sent as an empty array.
                             </div>
-                          ) : (
-                            <div className="rulesProvidersWrap">
-                              {!sectionRule.providerRules.length && (
-                                <div className="empty">
-                                  No provider rules yet.
-                                </div>
-                              )}
+                          ) : (() => {
+                            const sectionCatalog = sectionCatalogs[sectionKey] ?? {
+                              providers: [],
+                              gamesByProviderId: {},
+                            }
 
-                              <div className="rulesProvidersList">
-                                {sectionRule.providerRules.map((providerRule, providerIndex) => {
-                                  const isProviderLockedBySection = !sectionRule.enabled
-                                  const isGameLockedBySection = !sectionRule.enabled
-                                  const isGameLockedByProvider = !providerRule.enabled
-                                  const isGameLocked = isGameLockedBySection || isGameLockedByProvider
+                            const providers = sectionCatalog.providers ?? []
+                            const selectedProviderId = selectedProviderIdsBySection[sectionKey] ?? ''
+                            const selectedProvider = providers.find(
+                              item => String(item.finalProviderId) === String(selectedProviderId),
+                            ) ?? null
+                            const games = sectionCatalog.gamesByProviderId?.[String(selectedProviderId)] ?? []
+                            const providerValues = selectedProviderId
+                              ? getEffectiveProviderValues(sectionKey, selectedProviderId)
+                              : null
 
-                                  return (
-                                    <div
-                                      key={providerRule._id}
-                                      className={`providerRuleCard ${isProviderLockedBySection ? 'is-disabled' : ''}`}
-                                    >
-                                      <div className="providerRuleCard__row">
-                                        <div className="providerRuleCard__title">
-                                          <div className="group__title">
-                                            Provider rule {providerIndex + 1}
-                                            {providerRule.id ? (
-                                              <span className="badge">#{providerRule.id}</span>
-                                            ) : null}
-                                          </div>
-                                        </div>
+                            const isSectionLocked = !sectionRule.enabled
+                            const isLoadingSectionCatalog = Boolean(sectionCatalogsLoading[sectionKey])
 
-                                        <div className="field providerRuleCard__thumbField">
-                                          <div className="label">provider</div>
-                                          <img
-                                            className="ruleEntityThumb"
-                                            src="https://placehold.co/40x40?text=P"
-                                            alt="Provider"
-                                          />
-                                        </div>
+                            return (
+                              <div className="rulesProvidersWrap">
+                                {!providers.length && isLoadingSectionCatalog && (
+                                  <div className="empty">
+                                    Loading providers...
+                                  </div>
+                                )}
 
-                                        <div className="field">
-                                          <div className="label">enabled</div>
-                                          <ToggleSwitch
-                                            checked={providerRule.enabled}
-                                            disabled={isProviderLockedBySection}
-                                            onChange={value => updateProviderRule(sectionKey, providerRule._id, {
-                                              enabled: value,
-                                            })}
-                                            variant="primary"
-                                          />
-                                        </div>
+                                {!providers.length && !isLoadingSectionCatalog && (
+                                  <div className="empty">
+                                    No providers found for this section.
+                                  </div>
+                                )}
 
-                                        <div className="field">
-                                          <div className="label">xpPerAmount</div>
-                                          <input
-                                            className="input input--light"
-                                            type="number"
-                                            min="0"
-                                            step="any"
-                                            value={providerRule.xpPerAmount}
-                                            disabled={isProviderLockedBySection}
-                                            onChange={e => updateProviderRule(sectionKey, providerRule._id, {
-                                              xpPerAmount: e.target.value,
-                                            })}
-                                          />
-                                        </div>
+                                {!!providers.length && (
+                                  <>
+                                    <div className="levelsRulesToolbar">
+                                      <div className="field levelsRulesToolbar__providerSelect">
+                                        <div className="label">provider</div>
 
-                                        <div className="field">
-                                          <div className="label">gamesDefaultEnabled</div>
-                                          <ToggleSwitch
-                                            checked={providerRule.gamesDefaultEnabled}
-                                            disabled={isProviderLockedBySection}
-                                            onChange={value => updateProviderRule(sectionKey, providerRule._id, {
-                                              gamesDefaultEnabled: value,
-                                            })}
-                                            variant="secondary"
-                                            size="sm"
-                                          />
-                                        </div>
+                                        <select
+                                          className="select"
+                                          value={selectedProviderId}
+                                          onChange={e => {
+                                            const nextProviderId = e.target.value
 
-                                        <button
-                                          type="button"
-                                          className="btn btn--danger btn--small providerRuleCard__removeBtn"
-                                          disabled={isProviderLockedBySection}
-                                          onClick={() => removeProviderRule(sectionKey, providerRule._id)}
+                                            setSelectedProviderIdsBySection(prev => ({
+                                              ...prev,
+                                              [sectionKey]: nextProviderId,
+                                            }))
+                                          }}
                                         >
-                                          Remove
-                                        </button>
+                                          {providers.map(provider => (
+                                            <option
+                                              key={provider.finalProviderId}
+                                              value={String(provider.finalProviderId)}
+                                            >
+                                              {provider.name}
+                                            </option>
+                                          ))}
+                                        </select>
                                       </div>
 
-                                      <div className="rulesGamesWrap">
-                                        <div className="row row--space rulesProvidersTop">
-                                          <div className="sectionTitle--small">Game rules</div>
-
-                                          <button
-                                            type="button"
-                                            className="btn btn--ghost levelsInsertBtn"
-                                            disabled={isProviderLockedBySection}
-                                            onClick={() => addGameRule(sectionKey, providerRule._id)}
-                                          >
-                                            + Add game rule
-                                          </button>
-                                        </div>
-
-                                        {!providerRule.gameRules.length && (
-                                          <div className="empty">
-                                            No game rules yet.
+                                      {providerValues ? (
+                                        <div className="levelsRulesToolbar__providerSettings">
+                                          <div className="field">
+                                            <div className="label">enabled</div>
+                                            <ToggleSwitch
+                                              checked={providerValues.enabled}
+                                              disabled={isSectionLocked}
+                                              onChange={value => upsertProviderRuleByFinalProviderId(sectionKey, selectedProviderId, {
+                                                enabled: value,
+                                              })}
+                                              variant="primary"
+                                            />
                                           </div>
-                                        )}
 
-                                        <div className="rulesGamesList">
-                                          {providerRule.gameRules.map((gameRule, gameIndex) => (
+                                          <div className="field">
+                                            <div className="label">xpPerAmount</div>
+                                            <input
+                                              className="input input--light"
+                                              type="number"
+                                              min="0"
+                                              step="any"
+                                              value={providerValues.xpPerAmount}
+                                              disabled={isSectionLocked}
+                                              onChange={e => upsertProviderRuleByFinalProviderId(sectionKey, selectedProviderId, {
+                                                xpPerAmount: e.target.value,
+                                              })}
+                                            />
+                                          </div>
+
+                                          <div className="field">
+                                            <div className="label">gamesDefaultEnabled</div>
+                                            <ToggleSwitch
+                                              checked={providerValues.gamesDefaultEnabled}
+                                              disabled={isSectionLocked}
+                                              onChange={value => upsertProviderRuleByFinalProviderId(sectionKey, selectedProviderId, {
+                                                gamesDefaultEnabled: value,
+                                              })}
+                                              variant="secondary"
+                                              size="sm"
+                                            />
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    {selectedProvider ? (
+                                      <div className="mutedSmall">
+                                        Provider: {selectedProvider.name} #{selectedProvider.finalProviderId}
+                                      </div>
+                                    ) : null}
+
+                                    {isLoadingSectionCatalog && !games.length ? (
+                                      <div className="empty">
+                                        Loading games...
+                                      </div>
+                                    ) : !games.length ? (
+                                      <div className="empty">
+                                        No games found for selected provider.
+                                      </div>
+                                    ) : (
+                                      <div className="rulesGamesList">
+                                        {games.map(game => {
+                                          const gameValues = getEffectiveGameValues(
+                                            sectionKey,
+                                            selectedProviderId,
+                                            game.finalGameId,
+                                          )
+
+                                          const isGameLockedBySection = !sectionRule.enabled
+                                          const isGameLockedByProvider = !providerValues?.enabled
+                                          const isGameLocked = isGameLockedBySection || isGameLockedByProvider
+
+                                          return (
                                             <div
-                                              key={gameRule._id}
+                                              key={game.finalGameId}
                                               className={`gameRuleCard ${isGameLocked ? 'is-disabled' : ''}`}
                                             >
                                               <div className="gameRuleCard__row">
-                                                <div className="gameRuleCard__title">
-                                                  <div className="group__title">
-                                                    Game rule {gameIndex + 1}
-                                                    {gameRule.id ? (
-                                                      <span className="badge">#{gameRule.id}</span>
-                                                    ) : null}
-                                                  </div>
-                                                </div>
+                                                <div className="ruleEntityInfo">
+                                                  {game.image?.dfImg ? (
+                                                    <img
+                                                      className="ruleEntityThumb"
+                                                      src={'https://st.ma-ruay.com' + game.image.dfImg}
+                                                      alt={game.name || `Game ${game.finalGameId}`}
+                                                    />
+                                                  ) : (
+                                                    <div className="ruleEntityThumb ruleEntityThumb--placeholder">
+                                                      G
+                                                    </div>
+                                                  )}
 
-                                                <div className="field gameRuleCard__thumbField">
-                                                  <div className="label">game</div>
-                                                  <img
-                                                    className="ruleEntityThumb"
-                                                    src="https://placehold.co/40x40?text=G"
-                                                    alt="Game"
-                                                  />
+                                                  <div className="ruleEntityInfo__text">
+                                                    <div className="ruleEntityInfo__name">
+                                                      {game.name || `Game #${game.finalGameId}`}
+                                                    </div>
+
+                                                    <div className="ruleEntityInfo__meta">
+                                                      finalGameId: {game.finalGameId}
+                                                    </div>
+                                                  </div>
                                                 </div>
 
                                                 <div className="field">
                                                   <div className="label">enabled</div>
                                                   <ToggleSwitch
-                                                    checked={gameRule.enabled}
+                                                    checked={gameValues.enabled}
                                                     disabled={isGameLocked}
-                                                    onChange={value => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
-                                                      enabled: value,
-                                                    })}
+                                                    onChange={value => upsertGameRuleByFinalIds(
+                                                      sectionKey,
+                                                      selectedProviderId,
+                                                      game.finalGameId,
+                                                      {
+                                                        enabled: value,
+                                                      },
+                                                    )}
                                                     variant="primary"
                                                   />
                                                 </div>
@@ -1147,33 +1372,29 @@ export default function LevelsPage() {
                                                     type="number"
                                                     min="0"
                                                     step="any"
-                                                    value={gameRule.xpPerAmount}
+                                                    value={gameValues.xpPerAmount}
                                                     disabled={isGameLocked}
-                                                    onChange={e => updateGameRule(sectionKey, providerRule._id, gameRule._id, {
-                                                      xpPerAmount: e.target.value,
-                                                    })}
+                                                    onChange={e => upsertGameRuleByFinalIds(
+                                                      sectionKey,
+                                                      selectedProviderId,
+                                                      game.finalGameId,
+                                                      {
+                                                        xpPerAmount: e.target.value,
+                                                      },
+                                                    )}
                                                   />
                                                 </div>
-
-                                                <button
-                                                  type="button"
-                                                  className="btn btn--danger btn--small gameRuleCard__removeBtn"
-                                                  disabled={isGameLocked}
-                                                  onClick={() => removeGameRule(sectionKey, providerRule._id, gameRule._id)}
-                                                >
-                                                  Remove
-                                                </button>
                                               </div>
                                             </div>
-                                          ))}
-                                        </div>
+                                          )
+                                        })}
                                       </div>
-                                    </div>
-                                  )
-                                })}
+                                    )}
+                                  </>
+                                )}
                               </div>
-                            </div>
-                          )}
+                            )
+                          })()}
                         </div>
                       )
                     })()}
