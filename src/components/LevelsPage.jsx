@@ -1321,7 +1321,10 @@ export default function LevelsPage() {
                                           return (
                                             <div
                                               key={game.finalGameId}
-                                              className={`gameRuleCard ${isGameLocked ? 'is-disabled' : ''}`}
+                                              className={`gameRuleCard 
+                                                ${isGameLocked ? 'is-disabled' : ''} 
+                                                ${!isGameLocked && !gameValues.enabled ? 'is-game-disabled' : ''}
+                                              `}
                                             >
                                               <div className="gameRuleCard__row">
                                                 <div className="ruleEntityInfo">
