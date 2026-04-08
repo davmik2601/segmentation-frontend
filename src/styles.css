@@ -994,8 +994,7 @@ select option {
     width: auto;
     align-self: center;
     border-style: dashed;
-    padding-left: 18px;
-    padding-right: 18px;
+    padding: 6px 18px;
 }
 
 .levelCard {

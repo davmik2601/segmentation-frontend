@@ -174,18 +174,6 @@ export function validateLevelsSetupPayload(payload) {
     return {ok: false, errors}
   }
 
-  if (typeof payload.enabled !== 'boolean') {
-    errors.push('enabled must be boolean')
-  }
-
-  if (!Number.isInteger(payload.timeRangeDays) || payload.timeRangeDays < 0) {
-    errors.push('timeRangeDays must be int >= 0')
-  }
-
-  if (!(Number(payload.xpPerAmount) > 0)) {
-    errors.push('xpPerAmount must be > 0')
-  }
-
   if (!Array.isArray(payload.levels)) {
     errors.push('levels must be an array')
     return {ok: errors.length === 0, errors}
