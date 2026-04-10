@@ -93,7 +93,6 @@ export const api = {
                                   userId,
                                   search,
                                   segmentIds,
-                                  levelIds,
                                   tagIds,
                                   from,
                                   to,
@@ -106,7 +105,6 @@ export const api = {
         ...(userId !== undefined && userId !== null && userId !== '' ? {userId} : {}),
         ...(search ? {search} : {}),
         ...(segmentIds ? {segmentIds} : {}), // comma-separated: "0,1,3"
-        ...(levelIds ? {levelIds} : {}),     // comma-separated: "0,2,5"
         ...(tagIds ? {tagIds} : {}),         // comma-separated: "0,4,5"
         ...(from !== undefined && from !== null ? {from} : {}),
         ...(to !== undefined && to !== null ? {to} : {}),
