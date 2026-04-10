@@ -449,7 +449,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
 
                   // UI behavior similar to your backend refine rules
                   const isLogin = event === 'login'
-                  const isNetResult = event === 'net_result'
+                  const isNetResult = event === 'net_result' || event === 'net_profit_percentage'
                   const isCasino = event === 'casino'
                   const isSport = event === 'sport'
                   const isGgr = r.metric === 'ggr'
@@ -511,7 +511,7 @@ export default function TagBuilder({mode, initialState, onCreate, onUpdate}) {
                                 return
                               }
 
-                              if (nextEvent === 'net_result') {
+                              if (nextEvent === 'net_result' || nextEvent === 'net_profit_percentage') {
                                 updateRule(g._id, r._id, {event: nextEvent, aggregation: null, metric: null})
                                 return
                               }

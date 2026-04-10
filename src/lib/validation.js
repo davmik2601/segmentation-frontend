@@ -14,8 +14,8 @@ export function normalizeRuleByBusinessRules(rule) {
     out.metric = null
   }
 
-  // - if event == net_result => aggregation and metric must be null
-  if (out.event === 'net_result') {
+  // - if event == net_result or net_profit_percentage => aggregation and metric must be null
+  if (out.event === 'net_result' || out.event === 'net_profit_percentage') {
     out.aggregation = null
     out.metric = null
   }
@@ -89,8 +89,8 @@ export function validateTagPayload(payload) {
       if (!ENUMS.connectors.includes(r.connector)) errors.push(`rule[${gi}][${ri}].connector invalid`)
       if (!ENUMS.events.includes(r.event)) errors.push(`rule[${gi}][${ri}].event invalid`)
 
-      if (r.event === 'net_result') {
-        if (r.aggregation != null) errors.push(`rule[${gi}][${ri}].aggregation must be null when event=net_result`)
+      if (r.event === 'net_result' || r.event === 'net_profit_percentage') {
+        if (r.aggregation != null) errors.push(`rule[${gi}][${ri}].aggregation must be null when event=${r.event}`)
       } else if ((r.event === 'casino' || r.event === 'sport') && r.metric === 'ggr') {
         if (r.aggregation != null) errors.push(`rule[${gi}][${ri}].aggregation must be null when metric=ggr`)
       } else {
@@ -152,8 +152,8 @@ export function validateTagPayload(payload) {
         }
       }
 
-      if (r.event === 'net_result') {
-        if (r.metric != null) errors.push(`rule[${gi}][${ri}].metric must be null when event=net_result`)
+      if (r.event === 'net_result' || r.event === 'net_profit_percentage') {
+        if (r.metric != null) errors.push(`rule[${gi}][${ri}].metric must be null when event=${r.event}`)
       }
 
       if (r.event === 'login') {
