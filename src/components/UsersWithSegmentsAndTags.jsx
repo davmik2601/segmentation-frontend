@@ -174,6 +174,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
   // filters
   const [filterSearch, setFilterSearch] = useState('')
   const [segmentIds, setSegmentIds] = useState([]) // numbers
+  const [levelIds, setLevelIds] = useState([]) // numbers
   const [tagIds, setTagIds] = useState([]) // numbers
   const [assignedFromMs, setAssignedFromMs] = useState(null)
   const [assignedToMs, setAssignedToMs] = useState(null)
@@ -181,6 +182,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
 
   // data for filter lists
   const [segments, setSegments] = useState([])
+  const [levels, setLevels] = useState([])
   const [tags, setTags] = useState([])
 
   const limit = 50
@@ -204,6 +206,18 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
     ]
   }, [segments])
 
+  const levelOptions = useMemo(() => {
+    return [
+      {id: 0, name: '0 — No level', color: 'rgba(255,255,255,0.06)', description: 'Include users with no level'},
+      ...levels.map(l => ({
+        id: Number(l.id),
+        name: `${l.id} — ${l.name || l.slug}`,
+        color: l.color || undefined,
+        description: l.description || '',
+      })),
+    ]
+  }, [levels])
+
   const tagOptions = useMemo(() => {
     return [
       {id: 0, name: '0 — No tag', color: 'rgba(255,255,255,0.06)', description: 'Include users with no tags'},
@@ -225,6 +239,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
         offset,
         search: filterSearch || undefined,
         segmentIds: segmentIds.length ? segmentIds.join(',') : undefined,
+        levelIds: levelIds.length ? levelIds.join(',') : undefined,
         tagIds: tagIds.length ? tagIds.join(',') : undefined,
         from: assignedFromMs != null ? Math.floor(assignedFromMs / 1000) : null,
         to: assignedToMs != null ? Math.floor(assignedToMs / 1000) : null,
@@ -263,17 +278,19 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
     </div>
   )
 
-  // fetch segments + active tags once
+  // fetch segments + levels + active tags once
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const [segRes, tagRes] = await Promise.all([
+        const [segRes, levelRes, tagRes] = await Promise.all([
           api.getSegments(),
+          api.getLevels(),
           api.listTags({active: 1}), // active tags only
         ])
         if (cancelled) return
         setSegments(segRes?.segments ?? [])
+        setLevels(levelRes?.levels ?? [])
         setTags(tagRes?.tags ?? [])
       } catch (e) {
         if (cancelled) return
@@ -299,6 +316,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
     page,
     filterSearch,
     segmentIds.join(','),
+    levelIds.join(','),
     tagIds.join(','),
     assignedFromMs,
     assignedToMs,
@@ -349,6 +367,24 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
             {!!segmentIds.length && (
               <div className="mutedSmall" style={{marginTop: 6}}>
                 segmentIds: <span className="mono">{segmentIds.join(',')}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="field" style={{minWidth: 200, flex: '0 0 auto'}}>
+            <div className="label">Levels</div>
+            <MultiSelectPopover
+              label="Select levels"
+              options={levelOptions}
+              selectedIds={levelIds}
+              onChange={(ids) => {
+                setLevelIds(ids)
+                resetToFirstPage()
+              }}
+            />
+            {!!levelIds.length && (
+              <div className="mutedSmall" style={{marginTop: 6}}>
+                levelIds: <span className="mono">{levelIds.join(',')}</span>
               </div>
             )}
           </div>
@@ -434,6 +470,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
               onClick={() => {
                 setFilterSearch('')
                 setSegmentIds([])
+                setLevelIds([])
                 setTagIds([])
                 setAssignedFromMs(null)
                 setAssignedToMs(null)
@@ -447,7 +484,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
         </div>
 
         <div className="mutedSmall" style={{marginTop: 10}}>
-          Tip: include <b>0</b> in segments/tags to include users with no segment/tags.
+          Tip: include <b>0</b> in segments/levels/tags to include users with no segment/level/tags.
         </div>
       </div>
 
@@ -459,7 +496,8 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
           <tr>
             <th style={{width: 80}}>ID</th>
             <th style={{width: 320}}>Email</th>
-            <th style={{width: 340}}>Segment / Segmented At</th>
+            <th style={{width: 220}}>Segment / Segmented At</th>
+            <th style={{width: 220}}>Level / Assigned At</th>
             <th>Tags</th>
           </tr>
           </thead>
@@ -467,6 +505,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
           <tbody>
           {users.map(u => {
             const seg = u.segment || null
+            const level = u.level || null
             const tagsArr = Array.isArray(u.tags) ? u.tags : []
             return (
               <tr
@@ -477,15 +516,27 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
                 <td className="mono">{u.id}</td>
                 <td className="mono">{u.email || ''}</td>
 
+                <td style={{whiteSpace: 'nowrap'}}>
+                  <div className="row row--gap">
+                    <Badge
+                      text={seg?.name || seg?.slug || 'No segment'}
+                      description={seg?.description}
+                      color={seg?.color || undefined}
+                      muted={!seg}
+                      bottomText={seg?.assignedAt ? fmtDate(seg.assignedAt) : (u.segmentedAt ? fmtDate(u.segmentedAt) : '')}
+                    />
+                  </div>
+                </td>
+
                 <td>
                   <div className="stack stack--tight">
                     <div className="row row--gap" style={{flexWrap: 'wrap'}}>
                       <Badge
-                        text={seg?.name || seg?.slug || 'No segment'}
-                        description={seg?.description}
-                        color={seg?.color || undefined}
-                        muted={!seg}
-                        bottomText={seg?.assignedAt ? fmtDate(seg.assignedAt) : (u.segmentedAt ? fmtDate(u.segmentedAt) : '')}
+                        text={level?.name || level?.slug || 'No level'}
+                        description={level?.description}
+                        color={level?.color || undefined}
+                        muted={!level}
+                        bottomText={level?.assignedAt ? fmtDate(level.assignedAt) : ''}
                       />
                     </div>
                   </div>
@@ -515,7 +566,7 @@ export default function UsersWithSegmentsAndTags({onBack, onOpenUser, page, onPa
 
           {!loading && users.length === 0 && (
             <tr>
-              <td colSpan={4}>
+              <td colSpan={5}>
                 <div className="empty">No users found.</div>
               </td>
             </tr>
