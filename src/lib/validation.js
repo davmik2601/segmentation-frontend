@@ -227,23 +227,20 @@ export function validateLevelsSetupPayload(payload) {
       errors.push(`levels[${index}].fromXP must be less than toXP`)
     }
 
-    if (isFirst) {
-      if (fromXP == null || toXP == null) {
-        errors.push('toXP is required for the first level.')
-      }
-    }
-
-    if (isMiddle) {
-      if (fromXP == null || toXP == null) {
-        errors.push(`levels[${index}].fromXP and toXP are required for middle levels`)
-      }
+    if (fromXP == null) {
+      errors.push('fromXP is required for all levels except the first one (which is overwritten to 0 if missing).')
     }
 
     if (isLast) {
-      if (fromXP == null) {
-        errors.push('fromXP is required for the last level.')
+      if (toXP != null) {
+        errors.push(`toXP must be not provided (or null) for the last level.`)
+      }
+    } else {
+      if (fromXP == null || toXP == null) {
+        errors.push('fromXP and toXP are required for the first and midle levels.')
       }
     }
+
 
     if (index > 0) {
       const prev = payload.levels[index - 1]

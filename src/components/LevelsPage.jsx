@@ -353,7 +353,7 @@ export default function LevelsPage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('configs-and-rules')
+  const [activeTab, setActiveTab] = useState('levels')
   const [configSectionKey, setConfigSectionKey] = useState(null)
 
   const [sectionCatalogs, setSectionCatalogs] = useState({})
