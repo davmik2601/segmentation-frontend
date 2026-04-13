@@ -109,14 +109,15 @@ function recalculateLevels(levels) {
   for (let i = 0; i < levels.length; i++) {
     const level = levels[i]
     const span = getLevelBaseSpan(level)
+    const isLast = i === levels.length - 1
 
-    const fromXP = currentFrom
+    const fromXP = i === 0 ? 0 : currentFrom
     const toXP = currentFrom + span - 1
 
     next.push({
       ...level,
       fromXP: String(fromXP),
-      toXP: String(toXP),
+      toXP: isLast ? '' : String(toXP),
     })
 
     currentFrom = toXP + 1
@@ -374,7 +375,17 @@ export default function LevelsPage() {
   async function loadLevels() {
     const data = await api.getLevels()
     const list = Array.isArray(data?.levels) ? data.levels : []
-    setLevels(list.map(normalizeLevel))
+
+    const normalized = list.map(normalizeLevel)
+
+    if (normalized.length > 0) {
+      normalized[normalized.length - 1] = {
+        ...normalized[normalized.length - 1],
+        toXP: '',
+      }
+    }
+
+    setLevels(normalized)
   }
 
   async function loadConfigsAndRules() {
@@ -751,7 +762,9 @@ export default function LevelsPage() {
 
   const levelsPreviewPayload = useMemo(() => {
     return {
-      levels: levels.map(level => {
+      levels: levels.map((level, index) => {
+        const isLast = index === levels.length - 1
+
         const item = {
           ...(level.id ? {id: level.id} : {}),
           name: String(level.name ?? '').trim(),
@@ -761,10 +774,12 @@ export default function LevelsPage() {
           ...(String(level.color ?? '').trim()
             ? {color: String(level.color).trim().toLowerCase()}
             : {}),
-          ...(toIntOrNull(level.fromXP) != null
-            ? {fromXP: toIntOrNull(level.fromXP)}
-            : {}),
-          ...(toIntOrNull(level.toXP) != null
+          ...(index === 0
+            ? {fromXP: 0}
+            : toIntOrNull(level.fromXP) != null
+              ? {fromXP: toIntOrNull(level.fromXP)}
+              : {}),
+          ...(!isLast && toIntOrNull(level.toXP) != null
             ? {toXP: toIntOrNull(level.toXP)}
             : {}),
         }
@@ -1762,16 +1777,18 @@ export default function LevelsPage() {
                           className="input"
                           type="number"
                           min="0"
-                          value={level.fromXP}
+                          value={index === 0 ? '0' : level.fromXP}
+                          disabled={index === 0}
                           onChange={e => updateLevel(level._id, {fromXP: e.target.value})}
                           placeholder="fromXP"
                         />
 
                         <input
                           className="input"
-                          type="number"
-                          min="0"
-                          value={level.toXP}
+                          type={index === levels.length - 1 ? 'text' : 'number'}
+                          min={index === levels.length - 1 ? undefined : '0'}
+                          value={index === levels.length - 1 ? 'Infinity' : level.toXP}
+                          disabled={index === levels.length - 1}
                           onChange={e => updateLevel(level._id, {toXP: e.target.value})}
                           placeholder="toXP"
                         />

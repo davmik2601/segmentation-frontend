@@ -1060,6 +1060,17 @@ select option {
     gap: 8px;
 }
 
+.levelsXpRow .input:disabled {
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+.levelsXpRow .input:disabled[value="Infinity"] {
+    font-weight: 600;
+}
+.levelsXpRow .input:disabled[value="0"] {
+    font-weight: 600;
+}
+
 .levelsTextarea {
     min-height: 42px;
     height: 42px;
