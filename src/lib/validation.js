@@ -245,8 +245,8 @@ export function validateLevelsSetupPayload(payload) {
     if (index > 0) {
       const prev = payload.levels[index - 1]
 
-      if (prev.toXP != null && fromXP != null && prev.toXP + 1 !== fromXP) {
-        errors.push(`levels[${index}].fromXP must match previous level toXP + 1`)
+      if (prev.toXP != null && fromXP != null && prev.toXP !== fromXP) {
+        errors.push(`levels[${index}].fromXP must match previous level toXP`)
       }
     }
   })

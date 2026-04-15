@@ -54,7 +54,7 @@ function normalizeLevel(level) {
     toXP: toXP == null ? '' : String(toXP),
     baseSpan:
       fromXP != null && toXP != null && toXP >= fromXP
-        ? (toXP - fromXP) + 1
+        ? (toXP - fromXP)
         : 100,
   }
 }
@@ -64,7 +64,7 @@ function getLevelSpan(level) {
   const toXP = toIntOrNull(level?.toXP)
 
   if (fromXP != null && toXP != null && toXP >= fromXP) {
-    return (toXP - fromXP) + 1
+    return (toXP - fromXP)
   }
 
   return 100
@@ -113,7 +113,7 @@ function recalculateLevels(levels) {
     const isLast = i === levels.length - 1
 
     const fromXP = i === 0 ? 0 : currentFrom
-    const toXP = currentFrom + span - 1
+    const toXP = currentFrom + span
 
     next.push({
       ...level,
@@ -121,7 +121,7 @@ function recalculateLevels(levels) {
       toXP: isLast ? '' : String(toXP),
     })
 
-    currentFrom = toXP + 1
+    currentFrom = toXP
   }
 
   return next
@@ -571,7 +571,7 @@ export default function LevelsPage() {
       // for NEW levels only, when user changes xp range manually,
       // update their own baseSpan too, so later recalculations keep that new width
       if (!current.id && currentFrom != null && currentTo != null && currentTo >= currentFrom) {
-        current.baseSpan = (currentTo - currentFrom) + 1
+        current.baseSpan = (currentTo - currentFrom)
       }
 
       // when current fromXP changes -> previous toXP changes
@@ -580,7 +580,7 @@ export default function LevelsPage() {
 
         next[index - 1] = {
           ...next[index - 1],
-          toXP: fromXP == null ? '' : String(fromXP - 1),
+          toXP: fromXP == null ? '' : String(fromXP),
         }
       }
 
@@ -590,7 +590,7 @@ export default function LevelsPage() {
 
         next[index + 1] = {
           ...next[index + 1],
-          fromXP: toXP == null ? '' : String(toXP + 1),
+          fromXP: toXP == null ? '' : String(toXP),
         }
       }
 
@@ -1731,7 +1731,7 @@ export default function LevelsPage() {
         <div className="card">
           <div className="card__header">
             <div className="card__title">Levels setup</div>
-            <div className="hint">fromXP of next level is always previous toXP + 1</div>
+            <div className="hint">fromXP of next level is always same as previous toXP</div>
           </div>
 
           <div className="levelsBuilder">
