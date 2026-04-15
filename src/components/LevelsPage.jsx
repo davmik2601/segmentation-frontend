@@ -3,6 +3,7 @@ import {toast} from 'react-toastify'
 import {api} from '../lib/api.js'
 import {uid} from '../lib/uid.js'
 import {validateLevelsSetupPayload} from '../lib/validation.js'
+import DateTimeRangePicker from './DateTimeRangePicker.jsx'
 
 const LEVEL_SECTIONS = ['sport', 'casino', 'virtual-sport', 'live-casino']
 
@@ -371,6 +372,12 @@ export default function LevelsPage() {
 
   const [savedGlobalConfigs, setSavedGlobalConfigs] = useState(null)
   const [savedSectionRules, setSavedSectionRules] = useState({})
+
+  const [recalculateOpen, setRecalculateOpen] = useState(false)
+  const [recalculateMode, setRecalculateMode] = useState('by_history')
+  const [recalculateFromMs, setRecalculateFromMs] = useState(null)
+  const [recalculateToMs, setRecalculateToMs] = useState(null)
+  const [recalculating, setRecalculating] = useState(false)
 
   async function loadLevels() {
     const data = await api.getLevels()
@@ -1179,6 +1186,35 @@ export default function LevelsPage() {
     }
   }
 
+  async function reCalculateLeveling() {
+    const payload = {
+      mode: recalculateMode,
+    }
+
+    if (recalculateFromMs != null) {
+      payload.fromDate = Math.floor(recalculateFromMs / 1000)
+    }
+
+    if (recalculateToMs != null) {
+      payload.toDate = Math.floor(recalculateToMs / 1000)
+    }
+
+    setRecalculating(true)
+    setErr(null)
+
+    try {
+      await api.reCalculateLeveling(payload)
+      setRecalculateOpen(false)
+      toast.success('Leveling re-calculation completed')
+    } catch (e) {
+      const msg = e?.message || String(e)
+      setErr(msg)
+      toast.error(`Failed to re-calculate leveling: ${msg}`)
+    } finally {
+      setRecalculating(false)
+    }
+  }
+
   function renderSectionSettingsBlock(sectionKey, sectionRule, options = {}) {
     const {
       compact = false,
@@ -1278,14 +1314,27 @@ export default function LevelsPage() {
         </div>
 
         <div className="row row--gap">
-          <button className="btn" onClick={load} disabled={loading || saving}>
+          <button
+            className="btn"
+            onClick={() => setRecalculateOpen(true)}
+            disabled={loading || saving || recalculating}
+          >
+            Re-Calculate
+          </button>
+
+          <button className="btn" onClick={load} disabled={loading || saving || recalculating}>
             Refresh
           </button>
 
           <button
             className="btn btn--primary"
             onClick={activeTab === 'levels' ? saveLevels : saveGlobalConfigs}
-            disabled={loading || saving || (activeTab === 'configs-and-rules' && !isGlobalConfigsDirty)}
+            disabled={
+              loading ||
+              saving ||
+              recalculating ||
+              (activeTab === 'configs-and-rules' && !isGlobalConfigsDirty)
+            }
           >
             Save
           </button>
@@ -1816,6 +1865,90 @@ export default function LevelsPage() {
                 </button>
               </React.Fragment>
             ))}
+          </div>
+        </div>
+      )}
+
+      {recalculateOpen && (
+        <div className="modalOverlay" onClick={() => setRecalculateOpen(false)}>
+          <div
+            className="modal modal__dark recalculateModal"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal__header">
+              <div className="modal__title">Re-Calculate leveling</div>
+
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={() => setRecalculateOpen(false)}
+                disabled={recalculating}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="modal__body">
+              <div className="stack">
+                <div className="field">
+                  <div className="label">mode</div>
+                  <select
+                    className="select input--light"
+                    value={recalculateMode}
+                    onChange={e => setRecalculateMode(e.target.value)}
+                    disabled={recalculating}
+                  >
+                    <option value="by_history">by_history</option>
+                    <option value="by_current_configs">by_current_configs</option>
+                  </select>
+                </div>
+
+                <div className="field">
+                  <div className="label">date range</div>
+                  <DateTimeRangePicker
+                    fromMs={recalculateFromMs}
+                    toMs={recalculateToMs}
+                    onChange={({fromMs, toMs}) => {
+                      setRecalculateFromMs(fromMs)
+                      setRecalculateToMs(toMs)
+                    }}
+                    onDone={() => {
+                    }}
+                    placeholder="Select date range"
+                    months={2}
+                    nullToMeansNow={false}
+                    showToNowToggle={false}
+                    allowFuture={false}
+                  />
+                  <div className="hint" style={{marginTop: 6}}>
+                    Empty range means dates will not be sent.
+                  </div>
+                </div>
+
+                <div className="row row--gap recalculateModal__actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setRecalculateFromMs(null)
+                      setRecalculateToMs(null)
+                    }}
+                    disabled={recalculating}
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={reCalculateLeveling}
+                    disabled={recalculating}
+                  >
+                    {recalculating ? 'Processing...' : 'Run Re-Calculate'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

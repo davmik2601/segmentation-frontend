@@ -158,6 +158,16 @@ export const api = {
       },
     }),
 
+  reCalculateLeveling: ({mode, fromDate, toDate}) =>
+    req('/api/levels/re-calculate-leveling', {
+      method: 'POST',
+      body: {
+        mode,
+        ...(fromDate !== undefined && fromDate !== null ? {fromDate} : {}),
+        ...(toDate !== undefined && toDate !== null ? {toDate} : {}),
+      },
+    }),
+
   getSegmentStatistics: ({from, to, interval}) =>
     req('/api/statistics/segments', {
       body: {

@@ -1064,9 +1064,11 @@ select option {
     opacity: 0.8;
     cursor: not-allowed;
 }
+
 .levelsXpRow .input:disabled[value="Infinity"] {
     font-weight: 600;
 }
+
 .levelsXpRow .input:disabled[value="0"] {
     font-weight: 600;
 }
@@ -1205,6 +1207,7 @@ select option {
     justify-self: end;
     align-self: end;
 }
+
 .sectionSettingsActions.field {
     width: auto;
     min-width: 0;
@@ -1213,12 +1216,14 @@ select option {
     justify-self: end;
     align-self: end;
 }
+
 .sectionSettingsActions__inner {
     display: grid;
     grid-template-columns: auto auto;
     gap: 8px;
     align-items: center;
 }
+
 .sectionSettingsActions__save.is-hidden {
     visibility: hidden;
     pointer-events: none;
@@ -1463,6 +1468,7 @@ select option {
 .gameRuleCard.is-game-disabled {
     background: rgba(82, 46, 46, 0.2);
 }
+
 .gameRuleCard.is-changed {
     background: rgba(59, 154, 27, 0.4);
 }
@@ -1604,7 +1610,6 @@ select option {
 }
 
 
-
 .levelsRulesToolbar {
     display: grid;
     grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
@@ -1658,8 +1663,6 @@ select option {
     color: var(--muted2);
     font-weight: 700;
 }
-
-
 
 
 @media (max-width: 1200px) {
@@ -1723,4 +1726,20 @@ select option {
     .gameRuleCard__removeBtn {
         width: 100%;
     }
+}
+
+
+.recalculateModal {
+    width: min(560px, 96vw);
+    max-height: 92vh;
+    overflow: visible;
+}
+
+.recalculateModal .modal__body {
+    overflow: visible;
+}
+
+.recalculateModal__actions {
+    justify-content: flex-end;
+    margin-top: 8px;
 }
